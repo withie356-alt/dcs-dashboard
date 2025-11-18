@@ -20,6 +20,9 @@ class Dashboard {
         document.getElementById('dateFrom').value = this.formatDate(this.state.dateFrom);
         document.getElementById('dateTo').value = this.formatDate(this.state.dateTo);
 
+        // 메타데이터 미리 로드
+        await this.loadMetadata(false);
+
         console.log('✅ DCS 대시보드 준비 완료');
     }
 
@@ -770,6 +773,10 @@ class Dashboard {
                     loadBtn.textContent = '불러오기';
                     loadBtn.style.cssText = 'height: 36px; padding: 0 12px; font-size: 13px;';
                     loadBtn.onclick = async () => {
+                        // 메타데이터가 없으면 먼저 로드
+                        if (this.state.availableTagsData.length === 0) {
+                            await this.loadMetadata(false);
+                        }
                         this.state.selectedTags = item.tag_names;
                         this.renderWidgets();
                         this.refreshData();
@@ -846,6 +853,10 @@ class Dashboard {
             const result = await response.json();
 
             if (result.success && result.data) {
+                // 메타데이터가 없으면 먼저 로드
+                if (this.state.availableTagsData.length === 0) {
+                    await this.loadMetadata(false);
+                }
                 this.state.selectedTags = result.data.tag_names;
                 this.renderWidgets();
                 this.refreshData();
