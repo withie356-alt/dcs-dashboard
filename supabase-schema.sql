@@ -29,10 +29,8 @@ ON users(username);
 
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 
--- 기본 admin 사용자 추가 (비밀번호: admin)
-INSERT INTO users (username, password_hash)
-VALUES ('admin', '$2b$10$YourHashHere')  -- 실제 해시로 교체 필요
-ON CONFLICT (username) DO NOTHING;
+-- 기본 admin 사용자는 create-admin.js 스크립트로 생성하세요
+-- 명령어: node create-admin.js
 
 -- 3. 저장된 계기 선택 목록 테이블
 CREATE TABLE IF NOT EXISTS saved_tag_selections (
