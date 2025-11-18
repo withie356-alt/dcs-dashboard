@@ -482,6 +482,11 @@ class Dashboard {
             return;
         }
 
+        // 새로고침 시 dateTo를 현재 시간으로 업데이트 (최신 데이터 가져오기)
+        this.state.dateTo = new Date();
+        document.getElementById('dateTo').value = this.formatDate(this.state.dateTo);
+        console.log('🔄 dateTo 업데이트:', this.formatDate(this.state.dateTo));
+
         const refreshBtn = document.getElementById('refreshBtn');
         const loadingOverlay = document.getElementById('loadingOverlay');
         if (refreshBtn) {
