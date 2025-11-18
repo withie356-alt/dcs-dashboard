@@ -435,8 +435,12 @@ class Dashboard {
 
         const refreshBtn = document.getElementById('refreshBtn');
         const loadingOverlay = document.getElementById('loadingOverlay');
-        refreshBtn.classList.add('loading');
-        loadingOverlay.classList.add('show');
+        if (refreshBtn) {
+            refreshBtn.classList.add('loading');
+        }
+        if (loadingOverlay) {
+            loadingOverlay.classList.add('show');
+        }
 
         try {
             // 태그 이름을 소문자로 변환
@@ -476,8 +480,12 @@ class Dashboard {
             this.showNotification('데이터를 불러오는데 실패했습니다.', 'error');
             this.showConnectionError();
         } finally {
-            refreshBtn.classList.remove('loading');
-            loadingOverlay.classList.remove('show');
+            if (refreshBtn) {
+                refreshBtn.classList.remove('loading');
+            }
+            if (loadingOverlay) {
+                loadingOverlay.classList.remove('show');
+            }
         }
     }
 
