@@ -574,6 +574,85 @@
             text-align: center;
             display: none;
         }
+
+        /* 모바일 반응형 */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 14px;
+            }
+
+            .btn {
+                padding: 8px 12px;
+                font-size: 12px;
+                height: 36px;
+            }
+
+            .btn-primary {
+                white-space: nowrap;
+            }
+
+            .date-selector {
+                font-size: 11px;
+            }
+
+            .date-selector input {
+                font-size: 11px;
+                width: 85px;
+            }
+
+            .time-display {
+                font-size: 11px;
+            }
+
+            /* 태그 선택 모달 */
+            .modal-content {
+                max-width: 95vw !important;
+                margin: 20px;
+            }
+
+            .tag-item {
+                padding: 10px;
+            }
+
+            .tag-item-name {
+                font-size: 13px;
+                word-break: break-word;
+            }
+
+            .tag-item-desc {
+                font-size: 11px;
+                word-break: break-word;
+            }
+
+            .company-tags-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .widget {
+                min-height: auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 12px;
+            }
+
+            .btn {
+                padding: 6px 10px;
+                font-size: 11px;
+                height: 32px;
+            }
+
+            .date-selector input {
+                width: 75px;
+                font-size: 10px;
+            }
+
+            .controls-row {
+                gap: 8px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -602,8 +681,8 @@
 
             <div class="controls-row">
                 <button class="btn btn-primary" onclick="dashboard.openLayoutManager()" style="padding: 10px 14px;">☰</button>
-                <button class="btn btn-primary" onclick="dashboard.openTagSelector()">⚙ 계기 선택</button>
-                <button class="btn btn-primary" onclick="dashboard.refreshData()" id="refreshBtn">🔄 새로고침</button>
+                <button class="btn btn-primary" onclick="dashboard.openTagSelector()">계기 선택</button>
+                <button class="btn btn-primary" onclick="dashboard.refreshData()" id="refreshBtn">새로고침</button>
                 <div class="time-display" id="timeDisplay">
                     <div class="status-dot"></div>
                     <span id="currentDateTime">--</span>
