@@ -429,10 +429,10 @@ class Dashboard {
 
             widget.innerHTML = `
                 <div class="widget-header">
-                    <div class="widget-title">${tagName}</div>
+                    <div class="widget-title">${desc}</div>
                     <button class="widget-close" onclick="event.stopPropagation(); dashboard.removeWidget('${tagName}')">×</button>
                 </div>
-                <div class="widget-desc">${desc}</div>
+                <div class="widget-desc">${tagName}</div>
                 <div class="widget-value">
                     <span id="value-${tagName}">--</span>
                     <span class="widget-unit" id="unit-${tagName}"></span>
@@ -685,7 +685,7 @@ class Dashboard {
             t.tag_name && t.tag_name.toLowerCase() === tagName.toLowerCase()
         );
         const desc = tagData?.tag_desc || tagData?.description || this.getTagDescription(tagName);
-        title.innerHTML = `${tagName}<br><span style="font-size: 14px; font-weight: 400; color: #86868B;">(${desc})</span>`;
+        title.innerHTML = `${desc}<br><span style="font-size: 14px; font-weight: 400; color: #86868B;">(${tagName})</span>`;
 
         const chartData = this.state.chartData.get(tagName);
         if (!chartData || chartData.length === 0) {
