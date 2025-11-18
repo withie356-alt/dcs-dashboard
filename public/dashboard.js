@@ -761,8 +761,8 @@ class Dashboard {
                     const nameDiv = document.createElement('div');
                     nameDiv.style.cssText = 'flex: 1;';
                     nameDiv.innerHTML = `
-                        <div style="font-weight: 600; color: #1D1D1F; margin-bottom: 2px;">${item.name}</div>
-                        <div style="font-size: 12px; color: #86868B;">${item.tag_names.length}개 계기</div>
+                        <div style="font-size: 13px; font-weight: 600; color: #1D1D1F; margin-bottom: 2px;">${item.name}</div>
+                        <div style="font-size: 11px; color: #86868B;">${item.tag_names.length}개 계기</div>
                     `;
 
                     const btnGroup = document.createElement('div');

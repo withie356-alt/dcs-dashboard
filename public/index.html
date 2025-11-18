@@ -302,7 +302,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 24px 32px;
+            padding: 16px 24px;
             border-bottom: 1px solid #E5E5EA;
             flex-shrink: 0;
         }
@@ -321,14 +321,21 @@
         .close-btn {
             background: rgba(120,120,128,0.12);
             border: none;
-            width: 32px;
-            height: 32px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
             cursor: pointer;
-            font-size: 20px;
+            font-size: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
+            color: #86868B;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .close-btn:hover {
+            background: rgba(120,120,128,0.2);
         }
 
         .tag-search input {
@@ -756,18 +763,18 @@
                 <button class="close-btn" onclick="dashboard.closeModal('chartModal')">×</button>
             </div>
             <div class="modal-body" style="padding: 0;">
-                <div class="chart-stats" id="chartStats" style="display: flex; gap: 20px; padding: 20px 32px; background: #F5F5F7; border-bottom: 1px solid #E5E5EA;">
+                <div class="chart-stats" id="chartStats" style="display: flex; gap: 16px; padding: 12px 24px; background: #F5F5F7; border-bottom: 1px solid #E5E5EA;">
                     <div class="stat-item" style="flex: 1; text-align: center;">
-                        <div style="font-size: 11px; color: #86868B; margin-bottom: 4px;">최소값</div>
-                        <div id="statMin" style="font-size: 20px; font-weight: 700; color: #FF3B30;">--</div>
+                        <div style="font-size: 10px; color: #86868B; margin-bottom: 3px;">최소값</div>
+                        <div id="statMin" style="font-size: 16px; font-weight: 700; color: #FF3B30;">--</div>
                     </div>
                     <div class="stat-item" style="flex: 1; text-align: center;">
-                        <div style="font-size: 11px; color: #86868B; margin-bottom: 4px;">평균값</div>
-                        <div id="statAvg" style="font-size: 20px; font-weight: 700; color: #007AFF;">--</div>
+                        <div style="font-size: 10px; color: #86868B; margin-bottom: 3px;">평균값</div>
+                        <div id="statAvg" style="font-size: 16px; font-weight: 700; color: #007AFF;">--</div>
                     </div>
                     <div class="stat-item" style="flex: 1; text-align: center;">
-                        <div style="font-size: 11px; color: #86868B; margin-bottom: 4px;">최대값</div>
-                        <div id="statMax" style="font-size: 20px; font-weight: 700; color: #34C759;">--</div>
+                        <div style="font-size: 10px; color: #86868B; margin-bottom: 3px;">최대값</div>
+                        <div id="statMax" style="font-size: 16px; font-weight: 700; color: #34C759;">--</div>
                     </div>
                 </div>
                 <div style="height: 450px; padding: 20px 32px;">
