@@ -13,23 +13,16 @@ const bcrypt = require('bcrypt');
 dotenv.config();
 
 // Supabase 클라이언트 초기화
+// 환경변수 우선, 없으면 기본값 사용
+const supabaseUrl = process.env.SUPABASE_URL || 'https://cvadrvebtnwlhunlsgqq.supabase.co';
+const supabaseKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2YWRydmVidG53bGh1bmxzZ3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0MTI1MzEsImV4cCI6MjA3ODk4ODUzMX0.qAKXcRl37oDquwHyUg2NexwlKaMWCqaDWAcpELL_F2c';
+
 let supabase = null;
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
-
-// URL이 유효한 형식인지 확인
-const isValidUrl = supabaseUrl && supabaseUrl.startsWith('http') && supabaseUrl.includes('supabase');
-
-if (isValidUrl && supabaseKey && supabaseKey !== 'your_supabase_anon_key_here') {
-    try {
-        supabase = createClient(supabaseUrl, supabaseKey);
-        console.log('✅ Supabase client initialized');
-    } catch (error) {
-        console.log('⚠️ Supabase initialization failed:', error.message);
-    }
-} else {
-    console.log('⚠️ Supabase credentials not configured, caching disabled');
-    console.log('   To enable caching, set SUPABASE_URL and SUPABASE_ANON_KEY in .env');
+try {
+    supabase = createClient(supabaseUrl, supabaseKey);
+    console.log('✅ Supabase client initialized');
+} catch (error) {
+    console.log('⚠️ Supabase initialization failed:', error.message);
 }
 
 const app = express();
