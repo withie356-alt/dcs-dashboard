@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>DCS 실시간 모니터링</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #F5F5F7;
+            color: #1D1D1F;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .header-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        h1 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1D1D1F;
+            margin: 0;
+        }
+
+        .date-selector {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            padding: 4px 8px;
+            background: rgba(0, 122, 255, 0.08);
+            border-radius: 8px;
+            border: none;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .date-selector input {
+            border: none;
+            background: transparent;
+            font-size: 12px;
+            font-weight: 500;
+            color: #007AFF;
+            font-family: inherit;
+            cursor: pointer;
+            width: 100px;
+            padding-right: 2px;
+        }
+
+        .date-selector input::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            opacity: 0.7;
+            width: 14px;
+            height: 14px;
+        }
+
+        .date-selector input::-webkit-calendar-picker-indicator:hover {
+            opacity: 1;
+        }
+
+        .date-selector input::-webkit-inner-spin-button,
+        .date-selector input::-webkit-outer-spin-button {
+            display: none;
+        }
+
+        .date-selector input:focus {
+            outline: none;
+        }
+
+        .date-separator {
+            color: #007AFF;
+            font-weight: 600;
+            font-size: 10px;
+            margin: 0;
+        }
+
+        .controls-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+            height: 40px;
+            line-height: 1;
+        }
+
+        .btn-primary {
+            background: #007AFF;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0051D5;
+        }
+
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+
+        .btn.loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .time-display {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: rgba(0, 122, 255, 0.12);
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #007AFF;
+            height: 40px;
+        }
+
+        .time-display.error {
+            background: rgba(255, 59, 48, 0.12);
+            color: #FF3B30;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: currentColor;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .widget {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .widget:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+            transform: translateY(-2px);
+        }
+
+        .widget-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .widget-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #1D1D1F;
+            line-height: 1.3;
+        }
+
+        .widget-desc {
+            font-size: 11px;
+            color: #86868B;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .widget-close {
+            background: rgba(255, 59, 48, 0.1);
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            color: #FF3B30;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .widget-close:hover {
+            background: #FF3B30;
+            color: white;
+        }
+
+        .widget-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #007AFF;
+            margin: 4px 0;
+        }
+
+        .widget-unit {
+            font-size: 16px;
+            font-weight: 500;
+            color: #86868B;
+            margin-left: 6px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 32px;
+            border-bottom: 1px solid #E5E5EA;
+            flex-shrink: 0;
+        }
+
+        .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 32px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .close-btn {
+            background: rgba(120,120,128,0.12);
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tag-search input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #E5E5EA;
+            border-radius: 12px;
+            font-size: 14px;
+            font-family: inherit;
+            margin-bottom: 16px;
+        }
+
+        .tag-search input:focus {
+            outline: none;
+            border-color: #007AFF;
+        }
+
+        .tag-list-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+
+        .company-section h3 {
+            font-size: 12px;
+            font-weight: 700;
+            color: #007AFF;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #007AFF;
+        }
+
+        .company-tags-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .tag-item {
+            padding: 12px;
+            border: 1px solid #E5E5EA;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .tag-item:hover {
+            border-color: #007AFF;
+            background: rgba(0,122,255,0.05);
+        }
+
+        .tag-item.selected {
+            background: #007AFF;
+            border-color: #007AFF;
+            color: white;
+        }
+
+        .tag-item-name {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        .tag-item-desc {
+            font-size: 11px;
+            color: #86868B;
+        }
+
+        .tag-item.selected .tag-item-desc {
+            color: rgba(255,255,255,0.8);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            padding: 20px 32px;
+            background: white;
+            border-top: 1px solid #E5E5EA;
+            flex-shrink: 0;
+        }
+
+        .selected-count {
+            padding: 16px;
+            background: rgba(0,122,255,0.1);
+            border-radius: 12px;
+            text-align: center;
+            font-weight: 600;
+            color: #007AFF;
+            margin-bottom: 16px;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 16px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            z-index: 2000;
+            display: none;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .notification.show {
+            display: block;
+            animation: slideIn 0.3s;
+        }
+
+        .notification.success {
+            border-left: 4px solid #34C759;
+        }
+
+        .notification.error {
+            border-left: 4px solid #FF3B30;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .chart-modal .modal-content {
+            max-width: 1000px;
+        }
+
+        .chart-modal-body {
+            height: 500px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+
+            .tag-list-container {
+                grid-template-columns: 1fr;
+            }
+
+            .widget {
+                padding: 12px;
+            }
+
+            .widget-title {
+                font-size: 11px;
+            }
+
+            .widget-desc {
+                font-size: 10px;
+            }
+
+            .widget-value {
+                font-size: 22px;
+            }
+
+            .widget-unit {
+                font-size: 14px;
+            }
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .loading-overlay.show {
+            display: flex;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .login-screen {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #007AFF 0%, #5AC8FA 100%);
+        }
+
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 380px;
+        }
+
+        .login-box h2 {
+            font-size: 24px;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #E5E5EA;
+            border-radius: 12px;
+            font-size: 14px;
+            font-family: inherit;
+            margin-bottom: 12px;
+        }
+
+        .login-input:focus {
+            outline: none;
+            border-color: #007AFF;
+        }
+
+        #loginError {
+            color: #FF3B30;
+            font-size: 13px;
+            margin-top: 8px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 로그인 화면 -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-box">
+            <h2>DCS 모니터링 로그인</h2>
+            <input type="text" id="loginUsername" placeholder="아이디" class="login-input"
+                   onkeypress="if(event.key==='Enter') dashboard.login()">
+            <input type="password" id="loginPassword" placeholder="비밀번호" class="login-input"
+                   onkeypress="if(event.key==='Enter') dashboard.login()">
+            <button class="btn btn-primary" style="width: 100%;" onclick="dashboard.login()">로그인</button>
+            <div id="loginError"></div>
+        </div>
+    </div>
+
+    <!-- 메인 대시보드 -->
+    <div class="container" id="mainContainer" style="display: none;">
+        <div class="header">
+            <div class="header-row">
+                <h1>DCS 실시간 모니터링</h1>
+                <div class="date-selector">
+                    <input type="date" id="dateFrom" onchange="dashboard.onDateChange()">
+                    <span class="date-separator">-</span>
+                    <input type="date" id="dateTo" onchange="dashboard.onDateChange()">
+                </div>
+            </div>
+
+            <div class="controls-row">
+                <button class="btn btn-primary" onclick="dashboard.openTagSelector()">⚙ 계기 선택</button>
+                <button class="btn btn-primary" onclick="dashboard.refreshData()" id="refreshBtn">🔄 새로고침</button>
+                <div class="time-display" id="timeDisplay">
+                    <div class="status-dot"></div>
+                    <span id="currentDateTime">--</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid" id="dashboardGrid">
+            <!-- 위젯이 여기에 동적으로 추가됩니다 -->
+        </div>
+    </div>
+
+    <!-- 태그 선택 모달 -->
+    <div class="modal" id="tagSelectorModal" onclick="if(event.target===this) dashboard.closeModal('tagSelectorModal')">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="flex: 1;">
+                    <h2 class="modal-title" style="margin-bottom: 4px;">계기 선택</h2>
+                    <div id="metaLastUpdated" style="font-size: 11px; color: #86868B;">캐시 없음</div>
+                </div>
+                <button class="btn btn-primary" style="margin-right: 12px; height: 36px; padding: 8px 16px; font-size: 13px;" onclick="dashboard.refreshMetadata()" id="refreshMetaHeaderBtn">📥 목록 가져오기</button>
+                <button class="close-btn" onclick="dashboard.closeModal('tagSelectorModal')">×</button>
+            </div>
+
+            <div class="modal-body">
+                <div class="tag-search">
+                    <input type="text" id="tagSearchInput" placeholder="태그 검색..." oninput="dashboard.searchTags()">
+                </div>
+
+                <div class="selected-count" id="selectedCount">선택된 계기: 0개</div>
+
+                <div class="tag-list-container" id="tagListContainer">
+                    <!-- 태그 목록이 여기에 동적으로 추가됩니다 -->
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="dashboard.selectAllTags()">전체 선택</button>
+                <button class="btn btn-primary" onclick="dashboard.clearAllTags()">전체 해제</button>
+                <button class="btn" style="margin-left: auto; background: rgba(120,120,128,0.12); color: #1D1D1F;" onclick="dashboard.refreshMetadata()" id="refreshMetaBtn">🔄 API 새로고침</button>
+                <button class="btn btn-primary" onclick="dashboard.applySelectedTags()">적용</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 차트 모달 -->
+    <div class="modal chart-modal" id="chartModal" onclick="if(event.target===this) dashboard.closeModal('chartModal')">
+        <div class="modal-content" style="max-width: 1000px;">
+            <div class="modal-header">
+                <h2 class="modal-title" id="chartModalTitle">차트</h2>
+                <button class="close-btn" onclick="dashboard.closeModal('chartModal')">×</button>
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <div class="chart-stats" id="chartStats" style="display: flex; gap: 20px; padding: 20px 32px; background: #F5F5F7; border-bottom: 1px solid #E5E5EA;">
+                    <div class="stat-item" style="flex: 1; text-align: center;">
+                        <div style="font-size: 11px; color: #86868B; margin-bottom: 4px;">최소값</div>
+                        <div id="statMin" style="font-size: 20px; font-weight: 700; color: #FF3B30;">--</div>
+                    </div>
+                    <div class="stat-item" style="flex: 1; text-align: center;">
+                        <div style="font-size: 11px; color: #86868B; margin-bottom: 4px;">평균값</div>
+                        <div id="statAvg" style="font-size: 20px; font-weight: 700; color: #007AFF;">--</div>
+                    </div>
+                    <div class="stat-item" style="flex: 1; text-align: center;">
+                        <div style="font-size: 11px; color: #86868B; margin-bottom: 4px;">최대값</div>
+                        <div id="statMax" style="font-size: 20px; font-weight: 700; color: #34C759;">--</div>
+                    </div>
+                </div>
+                <div style="height: 450px; padding: 20px 32px;">
+                    <canvas id="chartModalCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 알림 -->
+    <div class="notification" id="notification"></div>
+
+    <!-- 로딩 오버레이 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <script src="dashboard.js?v=2"></script>
+</body>
+</html>

@@ -1,0 +1,1014 @@
+// DCS 실시간 모니터링 대시보드 - 보안 강화 버전
+class DCSRealTimeDashboard {
+    constructor() {
+        // API 엔드포인트 (백엔드 서버)
+        this.apiBaseUrl = window.location.origin + '/api';
+        
+        // 대시보드 상태
+        this.state = {
+            selectedTags: [],
+            availableTags: [],
+            widgets: new Map(),
+            layout: 'auto',
+            autoRefresh: false,
+            refreshInterval: 10000, // 10초
+            refreshTimer: null,
+            connectionStatus: 'disconnected',
+            chartData: new Map(),
+            maxDataPoints: 100,
+            lastUpdateTime: null,
+            dataCache: new Map(),
+            eventSources: new Map() // SSE 연결 관리
+        };
+
+        // 저장된 레이아웃
+        this.savedLayouts = [];
+
+        // 초기화
+        this.init();
+    }
+
+    async init() {
+        try {
+            // 로컬 스토리지에서 이전 설정 불러오기
+            this.loadPreviousState();
+
+            // 이벤트 리스너 설정
+            this.setupEventListeners();
+
+            // 서버 헬스 체크
+            await this.checkServerHealth();
+
+            // 저장된 레이아웃 불러오기
+            await this.loadSavedLayouts();
+
+            // 초기 데이터 로드
+            if (this.state.selectedTags.length > 0) {
+                await this.refreshData();
+            }
+
+            this.showNotification('대시보드가 준비되었습니다.', 'success');
+        } catch (error) {
+            console.error('초기화 실패:', error);
+            this.showNotification('대시보드 초기화에 실패했습니다.', 'error');
+        }
+    }
+
+    async checkServerHealth() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl.replace('/api', '')}/health`);
+            const data = await response.json();
+            
+            if (data.status === 'healthy') {
+                this.updateConnectionStatus('connected');
+            } else {
+                throw new Error('Server unhealthy');
+            }
+        } catch (error) {
+            this.updateConnectionStatus('disconnected');
+            throw error;
+        }
+    }
+
+    setupEventListeners() {
+        // 윈도우 리사이즈 이벤트
+        window.addEventListener('resize', () => {
+            this.adjustLayout();
+        });
+
+        // 페이지 언로드 시 SSE 연결 정리
+        window.addEventListener('beforeunload', () => {
+            this.closeAllEventSources();
+        });
+
+        // 키보드 단축키
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey) {
+                switch(e.key) {
+                    case 'r':
+                        e.preventDefault();
+                        this.refreshData();
+                        break;
+                    case 's':
+                        e.preventDefault();
+                        this.saveLayout();
+                        break;
+                    case 'l':
+                        e.preventDefault();
+                        this.loadLayout();
+                        break;
+                    case 'a':
+                        e.preventDefault();
+                        this.openTagSelector();
+                        break;
+                }
+            }
+        });
+
+        // 네트워크 상태 감지
+        window.addEventListener('online', () => {
+            this.showNotification('네트워크 연결됨', 'success');
+            this.refreshData();
+        });
+
+        window.addEventListener('offline', () => {
+            this.showNotification('네트워크 연결 끊김', 'error');
+            this.updateConnectionStatus('disconnected');
+        });
+    }
+
+    // 계기 목록 불러오기 (localStorage 캐싱 지원)
+    async loadAvailableTags(forceRefresh = false) {
+        try {
+            // 캐시된 데이터 확인
+            if (!forceRefresh) {
+                const cached = localStorage.getItem('dcs_available_tags');
+                const cacheTime = localStorage.getItem('dcs_tags_cache_time');
+
+                if (cached && cacheTime) {
+                    const cacheAge = Date.now() - parseInt(cacheTime);
+                    // 1시간 이내 캐시는 유효
+                    if (cacheAge < 3600000) {
+                        this.state.availableTagsData = JSON.parse(cached);
+                        this.state.availableTags = this.state.availableTagsData.map(t => t.tag_name);
+                        this.displayAvailableTags();
+                        console.log('캐시된 태그 목록 사용 (캐시 나이:', Math.floor(cacheAge/1000), '초)');
+                        return;
+                    }
+                }
+            }
+
+            this.showNotification('계기 목록을 불러오는 중...', 'info');
+
+            const response = await fetch(`${this.apiBaseUrl}/meta`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                // 전체 태그 정보 저장 (tag_name, tag_desc, company)
+                this.state.availableTagsData = result.data;
+                this.state.availableTags = result.data.map(t => t.tag_name);
+
+                // localStorage에 캐싱
+                localStorage.setItem('dcs_available_tags', JSON.stringify(result.data));
+                localStorage.setItem('dcs_tags_cache_time', Date.now().toString());
+
+                this.displayAvailableTags();
+                this.showNotification(`${this.state.availableTags.length}개의 계기를 불러왔습니다.`, 'success');
+            } else {
+                throw new Error(result.message || '태그 목록을 가져올 수 없습니다.');
+            }
+        } catch (error) {
+            console.error('태그 목록 로드 실패:', error);
+            this.showNotification('계기 목록을 불러오는데 실패했습니다.', 'error');
+        }
+    }
+
+    extractTagNames(data) {
+        // Lambda 응답 구조에 따라 태그 이름 추출
+        // 실제 데이터 구조에 맞게 수정 필요
+        if (Array.isArray(data)) {
+            return data.map(item => item.tag_name || item);
+        } else if (data.tags) {
+            return data.tags;
+        } else if (data.columns) {
+            // 컬럼 정보에서 태그 추출
+            return data.columns.filter(col => col !== 'timestamp');
+        }
+        return [];
+    }
+
+    displayAvailableTags() {
+        const tagList = document.getElementById('tagList');
+        tagList.innerHTML = '';
+
+        if (this.state.availableTags.length === 0) {
+            tagList.innerHTML = '<p style="text-align: center; color: #999;">사용 가능한 계기가 없습니다.</p>';
+            return;
+        }
+
+        // 회사별로 그룹핑
+        const groupedByCompany = {};
+        this.state.availableTagsData.forEach(tagData => {
+            const company = tagData.company || 'unknown';
+            if (!groupedByCompany[company]) {
+                groupedByCompany[company] = [];
+            }
+            groupedByCompany[company].push(tagData);
+        });
+
+        // 회사별로 표시
+        Object.entries(groupedByCompany).sort().forEach(([company, tags]) => {
+            // 회사 헤더
+            const groupHeader = document.createElement('h3');
+            groupHeader.textContent = company.toUpperCase();
+            groupHeader.style.cssText = 'grid-column: 1/-1; margin: 15px 0 10px 0; color: #667eea; font-size: 16px; border-bottom: 2px solid #667eea; padding-bottom: 5px;';
+            tagList.appendChild(groupHeader);
+
+            // 해당 회사의 태그들
+            tags.forEach(tagData => {
+                const tagName = tagData.tag_name;
+                const tagItem = document.createElement('div');
+                tagItem.className = 'tag-item';
+                if (this.state.selectedTags.includes(tagName)) {
+                    tagItem.classList.add('selected');
+                }
+
+                tagItem.innerHTML = `
+                    <div style="font-weight: 600; color: #333;">${tagName}</div>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">${tagData.tag_desc || '설명 없음'}</div>
+                `;
+
+                tagItem.onclick = () => this.toggleTagSelection(tagName, tagItem);
+                tagList.appendChild(tagItem);
+            });
+        });
+    }
+
+    groupTags(tags) {
+        const groups = { default: [] };
+        
+        tags.forEach(tag => {
+            // 태그 이름 패턴으로 그룹화 (예: FIT_, TIT_, PIT_ 등)
+            const match = tag.match(/^([A-Z]+)_/);
+            if (match) {
+                const prefix = match[1];
+                if (!groups[prefix]) {
+                    groups[prefix] = [];
+                }
+                groups[prefix].push(tag);
+            } else {
+                groups.default.push(tag);
+            }
+        });
+
+        return groups;
+    }
+
+    getTagDescription(tag) {
+        // 태그 타입별 설명
+        const descriptions = {
+            'FIT': '유량계',
+            'TIT': '온도계',
+            'PIT': '압력계',
+            'LIT': '레벨계',
+            'FCV': '유량 제어 밸브',
+            'TCV': '온도 제어 밸브',
+            'PCV': '압력 제어 밸브',
+            'LCV': '레벨 제어 밸브'
+        };
+
+        for (const [prefix, desc] of Object.entries(descriptions)) {
+            if (tag.startsWith(prefix)) {
+                return desc;
+            }
+        }
+        return '계측기';
+    }
+
+    toggleTagSelection(tag, element) {
+        if (this.state.selectedTags.includes(tag)) {
+            this.state.selectedTags = this.state.selectedTags.filter(t => t !== tag);
+            element.classList.remove('selected');
+        } else {
+            this.state.selectedTags.push(tag);
+            element.classList.add('selected');
+        }
+    }
+
+    applySelectedTags() {
+        this.closeModal('tagSelectorModal');
+        this.renderWidgets();
+        
+        if (this.state.autoRefresh) {
+            this.startAutoRefresh();
+        } else {
+            this.refreshData();
+        }
+        
+        this.saveState();
+    }
+
+    // 위젯 렌더링
+    renderWidgets() {
+        const grid = document.getElementById('dashboardGrid');
+        grid.innerHTML = '';
+        
+        // 기존 SSE 연결 종료
+        this.closeAllEventSources();
+        
+        this.state.widgets.clear();
+        this.state.chartData.clear();
+
+        this.state.selectedTags.forEach(tag => {
+            const widget = this.createWidget(tag);
+            grid.appendChild(widget);
+            this.state.widgets.set(tag, widget);
+            
+            // 차트 초기화
+            this.initChart(tag);
+            
+            // 실시간 데이터 스트림 연결 (옵션)
+            if (this.state.autoRefresh) {
+                this.connectEventSource(tag);
+            }
+        });
+
+        this.adjustLayout();
+    }
+
+    createWidget(tagName) {
+        const widget = document.createElement('div');
+        widget.className = 'widget';
+        widget.id = `widget-${tagName.replace(/[^a-z0-9]/gi, '-')}`;
+        
+        widget.innerHTML = `
+            <div class="widget-header">
+                <div class="widget-title">
+                    ${tagName}
+                    <span style="font-size: 12px; color: #999; margin-left: 8px;">${this.getTagDescription(tagName)}</span>
+                </div>
+                <div class="widget-actions">
+                    <button class="widget-btn" onclick="dashboard.toggleChartType('${tagName}')" title="차트 타입">📊</button>
+                    <button class="widget-btn" onclick="dashboard.refreshTag('${tagName}')" title="새로고침">🔄</button>
+                    <button class="widget-btn" onclick="dashboard.removeWidget('${tagName}')" title="제거">✕</button>
+                </div>
+            </div>
+            <div class="widget-content">
+                <div class="loading">
+                    <div class="spinner"></div>
+                </div>
+                <div class="widget-value" style="display:none;">
+                    <span id="value-${tagName.replace(/[^a-z0-9]/gi, '-')}">--</span>
+                    <span class="widget-unit" id="unit-${tagName.replace(/[^a-z0-9]/gi, '-')}"></span>
+                </div>
+                <div class="widget-chart">
+                    <canvas id="chart-${tagName.replace(/[^a-z0-9]/gi, '-')}"></canvas>
+                </div>
+                <div class="widget-info">
+                    <span id="min-${tagName.replace(/[^a-z0-9]/gi, '-')}">최소: --</span>
+                    <span id="max-${tagName.replace(/[^a-z0-9]/gi, '-')}">최대: --</span>
+                    <span id="avg-${tagName.replace(/[^a-z0-9]/gi, '-')}">평균: --</span>
+                </div>
+                <div class="widget-info" style="margin-top: 5px;">
+                    <span id="time-${tagName.replace(/[^a-z0-9]/gi, '-')}">--:--:--</span>
+                    <span id="status-${tagName.replace(/[^a-z0-9]/gi, '-')}" style="color: #999;">대기중</span>
+                </div>
+            </div>
+        `;
+        
+        return widget;
+    }
+
+    initChart(tagName) {
+        const safeId = tagName.replace(/[^a-z0-9]/gi, '-');
+        const ctx = document.getElementById(`chart-${safeId}`).getContext('2d');
+        
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: tagName,
+                    data: [],
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 0,
+                    pointHoverRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.parsed.y.toFixed(2)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            maxTicksLimit: 5
+                        }
+                    },
+                    y: {
+                        display: true,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                }
+            }
+        });
+        
+        this.state.chartData.set(tagName, {
+            chart: chart,
+            data: [],
+            timestamps: [],
+            chartType: 'line'
+        });
+    }
+
+    // 데이터 새로고침
+    async refreshData() {
+        if (this.state.selectedTags.length === 0) {
+            this.showNotification('모니터링할 계기를 선택해주세요.', 'warning');
+            return;
+        }
+
+        try {
+            const now = new Date();
+            const fromDate = new Date(now.getTime() - 24 * 3600000); // 24시간 전
+            
+            const requestBody = {
+                exec_from_dt: this.formatDate(fromDate),
+                exec_to_dt: this.formatDate(now),
+                tag_names: this.state.selectedTags
+            };
+
+            const response = await fetch(`${this.apiBaseUrl}/data`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                this.processData(result.data);
+                this.state.lastUpdateTime = new Date();
+                this.updateConnectionStatus('connected');
+            } else {
+                throw new Error(result.message || '데이터를 가져올 수 없습니다.');
+            }
+            
+        } catch (error) {
+            console.error('데이터 로드 실패:', error);
+            this.showNotification('데이터를 불러오는데 실패했습니다.', 'error');
+            this.updateConnectionStatus('disconnected');
+        }
+    }
+
+    async refreshTag(tagName) {
+        try {
+            const now = new Date();
+            const fromDate = new Date(now.getTime() - 24 * 3600000);
+            
+            const requestBody = {
+                exec_from_dt: this.formatDate(fromDate),
+                exec_to_dt: this.formatDate(now),
+                tag_names: [tagName]
+            };
+
+            const response = await fetch(`${this.apiBaseUrl}/data`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                this.processTagData(tagName, result.data);
+            }
+        } catch (error) {
+            console.error(`Failed to refresh ${tagName}:`, error);
+        }
+    }
+
+    processData(data) {
+        // 데이터 구조 파싱 및 처리
+        this.state.selectedTags.forEach(tagName => {
+            this.processTagData(tagName, data);
+        });
+    }
+
+    processTagData(tagName, data) {
+        const safeId = tagName.replace(/[^a-z0-9]/gi, '-');
+        
+        // 데이터 추출 (실제 데이터 구조에 맞게 수정 필요)
+        let values = [];
+        let timestamps = [];
+        
+        if (Array.isArray(data)) {
+            data.forEach(item => {
+                if (item[tagName] !== undefined && item[tagName] !== null) {
+                    values.push(parseFloat(item[tagName]));
+                    timestamps.push(item.timestamp || item.exec_tm || new Date().toISOString());
+                }
+            });
+        } else if (data[tagName]) {
+            values = data[tagName];
+            timestamps = data.timestamps || values.map((_, i) => new Date(Date.now() - i * 3600000).toISOString());
+        }
+
+        if (values.length === 0) {
+            console.warn(`No data for tag: ${tagName}`);
+            return;
+        }
+
+        // 통계 계산
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const avg = values.reduce((a, b) => a + b, 0) / values.length;
+        const lastValue = values[values.length - 1];
+
+        // UI 업데이트
+        this.updateWidget(tagName, lastValue, timestamps[timestamps.length - 1], { min, max, avg });
+
+        // 차트 업데이트
+        this.updateChart(tagName, values, timestamps);
+
+        // 로딩 숨기기
+        const widget = document.getElementById(`widget-${safeId}`);
+        if (widget) {
+            widget.querySelector('.loading').style.display = 'none';
+            widget.querySelector('.widget-value').style.display = 'block';
+        }
+    }
+
+    updateWidget(tagName, value, timestamp, stats = {}) {
+        const safeId = tagName.replace(/[^a-z0-9]/gi, '-');
+        
+        // 값 업데이트
+        const valueEl = document.getElementById(`value-${safeId}`);
+        if (valueEl) {
+            valueEl.textContent = typeof value === 'number' ? value.toFixed(2) : value;
+        }
+
+        // 통계 업데이트
+        if (stats.min !== undefined) {
+            const minEl = document.getElementById(`min-${safeId}`);
+            if (minEl) minEl.textContent = `최소: ${stats.min.toFixed(2)}`;
+        }
+
+        if (stats.max !== undefined) {
+            const maxEl = document.getElementById(`max-${safeId}`);
+            if (maxEl) maxEl.textContent = `최대: ${stats.max.toFixed(2)}`;
+        }
+
+        if (stats.avg !== undefined) {
+            const avgEl = document.getElementById(`avg-${safeId}`);
+            if (avgEl) avgEl.textContent = `평균: ${stats.avg.toFixed(2)}`;
+        }
+
+        // 시간 업데이트
+        const timeEl = document.getElementById(`time-${safeId}`);
+        if (timeEl) {
+            const time = new Date(timestamp);
+            timeEl.textContent = time.toLocaleTimeString('ko-KR');
+        }
+
+        // 상태 업데이트
+        const statusEl = document.getElementById(`status-${safeId}`);
+        if (statusEl) {
+            statusEl.textContent = '업데이트됨';
+            statusEl.style.color = '#4ade80';
+            setTimeout(() => {
+                statusEl.textContent = '정상';
+                statusEl.style.color = '#999';
+            }, 2000);
+        }
+    }
+
+    updateChart(tagName, values, timestamps) {
+        const chartData = this.state.chartData.get(tagName);
+        if (!chartData) return;
+
+        // 데이터 제한
+        const maxPoints = this.state.maxDataPoints;
+        if (values.length > maxPoints) {
+            values = values.slice(-maxPoints);
+            timestamps = timestamps.slice(-maxPoints);
+        }
+
+        // 차트 데이터 업데이트
+        chartData.chart.data.labels = timestamps.map(ts => {
+            const date = new Date(ts);
+            return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+        });
+        
+        chartData.chart.data.datasets[0].data = values;
+        chartData.chart.update('none'); // 애니메이션 없이 업데이트
+
+        // 데이터 캐시 저장
+        chartData.data = values;
+        chartData.timestamps = timestamps;
+    }
+
+    // Server-Sent Events 연결
+    connectEventSource(tagName) {
+        if (this.state.eventSources.has(tagName)) {
+            this.state.eventSources.get(tagName).close();
+        }
+
+        const eventSource = new EventSource(`${this.apiBaseUrl}/stream/${tagName}`);
+        
+        eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            this.handleRealtimeUpdate(data);
+        };
+
+        eventSource.onerror = (error) => {
+            console.error(`SSE error for ${tagName}:`, error);
+            eventSource.close();
+            this.state.eventSources.delete(tagName);
+        };
+
+        this.state.eventSources.set(tagName, eventSource);
+    }
+
+    handleRealtimeUpdate(data) {
+        const { tagName, value, timestamp } = data;
+        
+        // 차트 데이터 업데이트
+        const chartData = this.state.chartData.get(tagName);
+        if (chartData) {
+            // 새 데이터 추가
+            chartData.data.push(value);
+            chartData.timestamps.push(timestamp);
+            
+            // 데이터 제한
+            if (chartData.data.length > this.state.maxDataPoints) {
+                chartData.data.shift();
+                chartData.timestamps.shift();
+            }
+            
+            // UI 업데이트
+            this.updateWidget(tagName, value, timestamp);
+            this.updateChart(tagName, chartData.data, chartData.timestamps);
+        }
+    }
+
+    closeAllEventSources() {
+        this.state.eventSources.forEach(es => es.close());
+        this.state.eventSources.clear();
+    }
+
+    // 자동 새로고침
+    toggleAutoRefresh() {
+        this.state.autoRefresh = !this.state.autoRefresh;
+        const toggle = document.getElementById('autoRefreshToggle');
+        
+        if (this.state.autoRefresh) {
+            toggle.classList.add('active');
+            this.startAutoRefresh();
+            this.showNotification('자동 새로고침이 활성화되었습니다.', 'success');
+        } else {
+            toggle.classList.remove('active');
+            this.stopAutoRefresh();
+            this.closeAllEventSources();
+            this.showNotification('자동 새로고침이 비활성화되었습니다.', 'info');
+        }
+        
+        this.saveState();
+    }
+
+    startAutoRefresh() {
+        this.stopAutoRefresh();
+        
+        // SSE 사용 가능 시 SSE 연결
+        if (window.EventSource) {
+            this.state.selectedTags.forEach(tag => {
+                this.connectEventSource(tag);
+            });
+        } else {
+            // SSE 미지원 시 폴링
+            this.state.refreshTimer = setInterval(() => {
+                this.refreshData();
+            }, this.state.refreshInterval);
+        }
+    }
+
+    stopAutoRefresh() {
+        if (this.state.refreshTimer) {
+            clearInterval(this.state.refreshTimer);
+            this.state.refreshTimer = null;
+        }
+    }
+
+    // 레이아웃 관리
+    setLayout(layout) {
+        this.state.layout = layout;
+        this.adjustLayout();
+        this.closeModal('layoutSelectorModal');
+        this.saveState();
+    }
+
+    adjustLayout() {
+        const grid = document.getElementById('dashboardGrid');
+        
+        // 기존 클래스 제거
+        grid.className = 'dashboard-grid';
+        
+        // 새 레이아웃 적용
+        switch(this.state.layout) {
+            case '1x1':
+                grid.classList.add('grid-1x1');
+                break;
+            case '2x2':
+                grid.classList.add('grid-2x2');
+                break;
+            case '3x3':
+                grid.classList.add('grid-3x3');
+                break;
+            case '4x4':
+                grid.classList.add('grid-4x4');
+                break;
+            case 'auto':
+            default:
+                // 자동 조정 (기본값)
+                break;
+        }
+    }
+
+    async saveLayout() {
+        const layoutName = prompt('레이아웃 이름을 입력하세요:');
+        if (!layoutName) return;
+
+        const layoutData = {
+            name: layoutName,
+            layout: {
+                selectedTags: this.state.selectedTags,
+                gridLayout: this.state.layout,
+                autoRefresh: this.state.autoRefresh,
+                refreshInterval: this.state.refreshInterval
+            }
+        };
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/layouts`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(layoutData)
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showNotification('레이아웃이 저장되었습니다.', 'success');
+                await this.loadSavedLayouts();
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            console.error('레이아웃 저장 실패:', error);
+            // 로컬 스토리지에 백업 저장
+            this.saveLayoutLocally(layoutData);
+        }
+    }
+
+    saveLayoutLocally(layoutData) {
+        const layouts = JSON.parse(localStorage.getItem('dcs_layouts') || '[]');
+        layouts.push({
+            ...layoutData,
+            createdAt: new Date().toISOString()
+        });
+        localStorage.setItem('dcs_layouts', JSON.stringify(layouts));
+        this.showNotification('레이아웃이 로컬에 저장되었습니다.', 'success');
+    }
+
+    async loadLayout() {
+        if (this.savedLayouts.length === 0) {
+            this.showNotification('저장된 레이아웃이 없습니다.', 'info');
+            return;
+        }
+
+        const layoutList = this.savedLayouts.map((l, i) => `${i + 1}. ${l.name}`).join('\n');
+        const selection = prompt(`불러올 레이아웃을 선택하세요:\n${layoutList}`);
+        
+        if (!selection) return;
+        
+        const index = parseInt(selection) - 1;
+        if (index >= 0 && index < this.savedLayouts.length) {
+            const layout = this.savedLayouts[index].layout;
+            
+            this.state.selectedTags = layout.selectedTags || [];
+            this.state.layout = layout.gridLayout || 'auto';
+            this.state.autoRefresh = layout.autoRefresh || false;
+            this.state.refreshInterval = layout.refreshInterval || 10000;
+            
+            this.renderWidgets();
+            this.adjustLayout();
+            
+            if (this.state.autoRefresh) {
+                this.startAutoRefresh();
+            }
+            
+            this.refreshData();
+            this.showNotification('레이아웃을 불러왔습니다.', 'success');
+        }
+    }
+
+    async loadSavedLayouts() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/layouts`);
+            const result = await response.json();
+            
+            if (result.success) {
+                this.savedLayouts = result.layouts;
+            }
+        } catch (error) {
+            console.error('저장된 레이아웃 로드 실패:', error);
+            // 로컬 스토리지에서 로드
+            this.savedLayouts = JSON.parse(localStorage.getItem('dcs_layouts') || '[]');
+        }
+        
+        return this.savedLayouts;
+    }
+
+    // 위젯 제거
+    removeWidget(tagName) {
+        if (confirm(`${tagName} 위젯을 제거하시겠습니까?`)) {
+            // 선택된 태그에서 제거
+            this.state.selectedTags = this.state.selectedTags.filter(t => t !== tagName);
+            
+            // SSE 연결 종료
+            if (this.state.eventSources.has(tagName)) {
+                this.state.eventSources.get(tagName).close();
+                this.state.eventSources.delete(tagName);
+            }
+            
+            // 차트 데이터 제거
+            this.state.chartData.delete(tagName);
+            
+            // 위젯 제거
+            this.state.widgets.delete(tagName);
+            
+            // DOM에서 제거
+            const widget = document.getElementById(`widget-${tagName.replace(/[^a-z0-9]/gi, '-')}`);
+            if (widget) {
+                widget.remove();
+            }
+            
+            this.saveState();
+            this.showNotification(`${tagName} 위젯이 제거되었습니다.`, 'info');
+        }
+    }
+
+    // 차트 타입 변경
+    toggleChartType(tagName) {
+        const chartData = this.state.chartData.get(tagName);
+        if (!chartData) return;
+        
+        const types = ['line', 'bar', 'area'];
+        const currentIndex = types.indexOf(chartData.chartType || 'line');
+        const newType = types[(currentIndex + 1) % types.length];
+        
+        chartData.chartType = newType;
+        
+        // 차트 타입 변경
+        if (newType === 'area') {
+            chartData.chart.data.datasets[0].fill = true;
+            chartData.chart.config.type = 'line';
+        } else if (newType === 'bar') {
+            chartData.chart.config.type = 'bar';
+        } else {
+            chartData.chart.data.datasets[0].fill = false;
+            chartData.chart.config.type = 'line';
+        }
+        
+        chartData.chart.update();
+    }
+
+    // 상태 관리
+    saveState() {
+        const state = {
+            selectedTags: this.state.selectedTags,
+            layout: this.state.layout,
+            autoRefresh: this.state.autoRefresh,
+            refreshInterval: this.state.refreshInterval
+        };
+        
+        localStorage.setItem('dcs_dashboard_state', JSON.stringify(state));
+    }
+
+    loadPreviousState() {
+        const savedState = localStorage.getItem('dcs_dashboard_state');
+        if (savedState) {
+            try {
+                const state = JSON.parse(savedState);
+                this.state.selectedTags = state.selectedTags || [];
+                this.state.layout = state.layout || 'auto';
+                this.state.autoRefresh = state.autoRefresh || false;
+                this.state.refreshInterval = state.refreshInterval || 10000;
+                
+                // UI 상태 복원
+                if (this.state.autoRefresh) {
+                    document.getElementById('autoRefreshToggle').classList.add('active');
+                }
+            } catch (error) {
+                console.error('상태 복원 실패:', error);
+            }
+        }
+    }
+
+    // UI 헬퍼 함수
+    openTagSelector() {
+        document.getElementById('tagSelectorModal').classList.add('active');
+        this.loadAvailableTags();
+    }
+
+    openLayoutSelector() {
+        document.getElementById('layoutSelectorModal').classList.add('active');
+    }
+
+    closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('active');
+    }
+
+    updateConnectionStatus(status) {
+        this.state.connectionStatus = status;
+        const statusDot = document.getElementById('connectionStatus');
+        const statusText = document.getElementById('connectionText');
+        
+        if (status === 'connected') {
+            statusDot.className = 'status-dot connected';
+            statusText.textContent = '연결됨';
+        } else {
+            statusDot.className = 'status-dot disconnected';
+            statusText.textContent = '연결 끊김';
+        }
+    }
+
+    showNotification(message, type = 'info') {
+        const notification = document.getElementById('notification');
+        notification.textContent = message;
+        notification.className = `notification show ${type}`;
+        
+        setTimeout(() => {
+            notification.classList.remove('show');
+        }, 3000);
+    }
+
+    formatDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+}
+
+// 대시보드 인스턴스 생성
+let dashboard;
+
+document.addEventListener('DOMContentLoaded', () => {
+    dashboard = new DCSRealTimeDashboard();
+});
+
+// 전역 함수 (HTML에서 호출용)
+window.dashboard = {
+    openTagSelector: () => dashboard?.openTagSelector(),
+    openLayoutSelector: () => dashboard?.openLayoutSelector(),
+    closeModal: (id) => dashboard?.closeModal(id),
+    saveLayout: () => dashboard?.saveLayout(),
+    loadLayout: () => dashboard?.loadLayout(),
+    refreshData: () => dashboard?.refreshData(),
+    refreshTag: (tag) => dashboard?.refreshTag(tag),
+    removeWidget: (tag) => dashboard?.removeWidget(tag),
+    toggleAutoRefresh: () => dashboard?.toggleAutoRefresh(),
+    setLayout: (layout) => dashboard?.setLayout(layout),
+    loadAvailableTags: () => dashboard?.loadAvailableTags(),
+    applySelectedTags: () => dashboard?.applySelectedTags(),
+    toggleChartType: (tag) => dashboard?.toggleChartType(tag)
+};

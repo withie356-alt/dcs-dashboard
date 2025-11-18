@@ -1,0 +1,289 @@
+// DCS Dashboard Backend Server
+// 이 서버는 AWS 인증을 처리하고 프론트엔드에 안전한 API를 제공합니다.
+
+const express = require('express');
+const cors = require('cors');
+const axios = require('axios');
+const aws4 = require('aws4');
+const dotenv = require('dotenv');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const path = require('path');
+
+// 환경변수 로드
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// 보안 미들웨어
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+            scriptSrcAttr: ["'unsafe-inline'"],  // 인라인 이벤트 핸들러 허용
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "https:"],
+            connectSrc: ["'self'", "https://cdn.jsdelivr.net", "https:"],
+            fontSrc: ["'self'", "https:", "data:"],
+            objectSrc: ["'none'"],
+            mediaSrc: ["'self'"],
+            frameSrc: ["'none'"]
+        }
+    }
+}));
+app.use(cors({
+    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+    credentials: true
+}));
+app.use(express.json());
+app.use(express.static('public'));
+
+// Rate limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15분
+    max: 100 // 최대 100개 요청
+});
+app.use('/api/', limiter);
+
+// AWS 설정 검증
+const validateAWSConfig = () => {
+    const required = ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_REGION'];
+    const missing = required.filter(key => !process.env[key]);
+    
+    if (missing.length > 0) {
+        console.error(`Missing required environment variables: ${missing.join(', ')}`);
+        process.exit(1);
+    }
+};
+
+// AWS Signature V4 생성
+const signRequest = (options) => {
+    const credentials = {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+    };
+    
+    return aws4.sign(options, credentials);
+};
+
+// 메타데이터 조회 API
+app.get('/api/meta', async (req, res) => {
+    try {
+        const options = {
+            host: new URL(process.env.LAMBDA_META_URL).host,
+            path: new URL(process.env.LAMBDA_META_URL).pathname,
+            method: 'GET',
+            region: process.env.AWS_REGION,
+            service: 'lambda',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        };
+
+        const signedRequest = signRequest(options);
+        
+        const response = await axios({
+            url: process.env.LAMBDA_META_URL,
+            method: 'GET',
+            headers: signedRequest.headers
+        });
+
+        // 응답 파싱
+        const result = response.data;
+        const data = result.data ? JSON.parse(result.data) : null;
+        
+        res.json({
+            success: true,
+            message: result.msg,
+            data: data
+        });
+    } catch (error) {
+        console.error('Meta data fetch error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch metadata',
+            error: error.message
+        });
+    }
+});
+
+// DCS 데이터 조회 API
+app.post('/api/data', async (req, res) => {
+    try {
+        const { exec_from_dt, exec_to_dt, tag_names } = req.body;
+        
+        // 날짜 검증
+        const fromDate = new Date(exec_from_dt);
+        const toDate = new Date(exec_to_dt);
+        const maxRange = 31 * 24 * 60 * 60 * 1000; // 31일
+        
+        if (toDate - fromDate > maxRange) {
+            return res.status(400).json({
+                success: false,
+                message: 'Date range cannot exceed 31 days'
+            });
+        }
+
+        const payload = {
+            exec_from_dt,
+            exec_to_dt
+        };
+        
+        if (tag_names && tag_names.length > 0) {
+            payload.tag_names = tag_names;
+        }
+
+        const body = JSON.stringify(payload);
+        console.log('Sending to Lambda:', payload);
+        console.log('Body:', body);
+
+        const options = {
+            host: new URL(process.env.LAMBDA_DATA_URL).host,
+            path: new URL(process.env.LAMBDA_DATA_URL).pathname,
+            method: 'POST',
+            region: process.env.AWS_REGION,
+            service: 'lambda',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(body)
+            },
+            body: body
+        };
+
+        const signedRequest = signRequest(options);
+        
+        const response = await axios({
+            url: process.env.LAMBDA_DATA_URL,
+            method: 'POST',
+            headers: signedRequest.headers,
+            data: body
+        });
+
+        // 응답 파싱
+        const result = response.data;
+        const data = result.data ? JSON.parse(result.data) : null;
+        
+        res.json({
+            success: true,
+            message: result.msg,
+            data: data
+        });
+    } catch (error) {
+        console.error('Data fetch error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch data',
+            error: error.message
+        });
+    }
+});
+
+// 실시간 데이터 스트림 (Server-Sent Events)
+app.get('/api/stream/:tagName', (req, res) => {
+    const { tagName } = req.params;
+    
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+    });
+
+    // 주기적으로 데이터 전송
+    const interval = setInterval(async () => {
+        try {
+            // 최신 데이터 조회
+            const now = new Date();
+            const fromDate = new Date(now.getTime() - 3600000); // 1시간 전
+            
+            const payload = {
+                exec_from_dt: fromDate.toISOString().split('T')[0],
+                exec_to_dt: now.toISOString().split('T')[0],
+                tag_names: [tagName]
+            };
+
+            // Lambda 호출 (위의 로직 재사용)
+            // ... 실제 데이터 조회 로직 ...
+            
+            const data = {
+                tagName: tagName,
+                value: Math.random() * 100, // 실제 데이터로 교체
+                timestamp: new Date().toISOString()
+            };
+            
+            res.write(`data: ${JSON.stringify(data)}\n\n`);
+        } catch (error) {
+            console.error('Stream error:', error);
+        }
+    }, process.env.AUTO_REFRESH_INTERVAL || 10000);
+
+    // 클라이언트 연결 종료 처리
+    req.on('close', () => {
+        clearInterval(interval);
+    });
+});
+
+// 레이아웃 저장/불러오기 API (로컬 파일 시스템 사용)
+const fs = require('fs').promises;
+const LAYOUTS_DIR = './layouts';
+
+// 레이아웃 디렉토리 생성
+(async () => {
+    try {
+        await fs.mkdir(LAYOUTS_DIR, { recursive: true });
+    } catch (error) {
+        console.error('Failed to create layouts directory:', error);
+    }
+})();
+
+app.get('/api/layouts', async (req, res) => {
+    try {
+        const files = await fs.readdir(LAYOUTS_DIR);
+        const layouts = [];
+        
+        for (const file of files) {
+            if (file.endsWith('.json')) {
+                const content = await fs.readFile(path.join(LAYOUTS_DIR, file), 'utf8');
+                layouts.push(JSON.parse(content));
+            }
+        }
+        
+        res.json({ success: true, layouts });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/layouts', async (req, res) => {
+    try {
+        const { name, layout } = req.body;
+        const filename = `${name.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.json`;
+        
+        await fs.writeFile(
+            path.join(LAYOUTS_DIR, filename),
+            JSON.stringify({ name, layout, createdAt: new Date() }, null, 2)
+        );
+        
+        res.json({ success: true, filename });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 헬스체크
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development'
+    });
+});
+
+// 서버 시작
+validateAWSConfig();
+app.listen(PORT, () => {
+    console.log(`DCS Dashboard Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`AWS Region: ${process.env.AWS_REGION}`);
+});

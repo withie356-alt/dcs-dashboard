@@ -1,0 +1,249 @@
+export default {
+  async fetch(request, env, ctx) {
+    // 0) CORS & Preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders() });
+    }
+
+    // 1) 간단 API Key
+    const clientKey = request.headers.get("x-api-key");
+    if (clientKey !== env.API_SECRET) {
+      return new Response("Forbidden", { status: 403, headers: corsHeaders() });
+    }
+
+    const reqUrl = new URL(request.url);
+    const path = reqUrl.pathname.replace(/\/+$/, "");
+
+    // 2) 라우팅: 경로에 따라 Lambda Function URL 결정
+    const routeInfo = getRouteInfo(path, env);
+    if (!routeInfo || !routeInfo.value) {
+      const hint = path === "/meta" || path === "" ? "환경변수 확인: AWS_FUNCTION_URL_META" : "환경변수 확인: AWS_FUNCTION_URL_DCS_HOURLY";
+      return jsonRes({ error: `No route for path: ${path}`, hint }, 404);
+    }
+
+    // 3) 바디 준비 및 정제
+    let method = request.method.toUpperCase();
+    let body = (method === "GET" || method === "HEAD") ? "" : (await request.text() || "");
+
+    // 디버깅: 원본 body 로그
+    console.log("Original body received:", body);
+
+    // Power Automate가 보내는 BOM이나 숨겨진 문자 제거 + tag_names 소문자 변환
+    if (body && body.trim()) {
+      try {
+        const parsed = JSON.parse(body);
+        console.log("Parsed body before transformation:", JSON.stringify(parsed));
+
+        // tag_names 배열의 모든 값을 소문자로 변환
+        if (parsed.tag_names && Array.isArray(parsed.tag_names)) {
+          parsed.tag_names = parsed.tag_names.map(tag =>
+            typeof tag === 'string' ? tag.toLowerCase() : tag
+          );
+          console.log("tag_names after lowercase:", parsed.tag_names);
+        }
+
+        body = JSON.stringify(parsed); // 파싱 후 다시 문자열로 변환하여 정제
+        console.log("Final body to send:", body);
+      } catch (e) {
+        console.log("JSON parse error:", e.message);
+        // JSON이 아닌 경우 그대로 사용
+      }
+    } else {
+      console.log("Body is empty or whitespace only");
+    }
+
+    // =================================================================
+    // CASE 1: Lambda 함수 직접 호출 (invoke) - for /dcs-hourly
+    // =================================================================
+    if (routeInfo.type === "invoke") {
+      const targetFunctionName = routeInfo.value;
+
+      // 파이썬 코드와 동일하게 직접 JSON 전달 (이미 28-33번째 줄에서 정제됨)
+      let invokeBody = body || "{}";
+
+      const { headers: outHeaders } = await signAwsV4(env, {
+          type: "invoke",
+          service: "lambda",
+          host: `lambda.${env.AWS_REGION || "ap-northeast-2"}.amazonaws.com`,
+          path: `/2015-03-31/functions/${targetFunctionName}/invocations`,
+          method: "POST",
+          body: invokeBody,
+      });
+
+      try {
+        const awsResp = await fetch(`https://${outHeaders.Host}${outHeaders.Path}`, { method: "POST", headers: outHeaders, body: invokeBody });
+
+        // 디버깅: AWS 응답 상태 확인
+        console.log("AWS Response Status:", awsResp.status);
+        console.log("AWS Response Headers:", JSON.stringify([...awsResp.headers]));
+
+        const respPayload = await awsResp.json();
+
+        // 디버깅: 전체 응답 구조 확인
+        console.log("Full respPayload structure:", JSON.stringify(respPayload));
+        console.log("respPayload keys:", Object.keys(respPayload));
+
+        // Lambda invoke API HTTP 응답: respPayload 자체가 Lambda 함수의 반환값
+        // (boto3와 달리 Payload 필드로 감싸지지 않음)
+        const payload = JSON.stringify(respPayload);
+
+        // 디버깅: 입력/출력 로깅
+        console.log("Worker sent to Lambda:", invokeBody);
+        console.log("Lambda response (final):", payload);
+
+        return new Response(payload, { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders() } });
+      } catch (e) {
+        console.log("Error in Lambda invoke:", e);
+        return jsonRes({ error: String(e?.name || "FetchError"), message: String(e?.message || e) }, 504);
+      }
+    }
+
+    // =================================================================
+    // CASE 2: Lambda Function URL 호출 (fetch) - for /meta
+    // =================================================================
+    else if (routeInfo.type === "url") {
+      const targetUrl = routeInfo.value;
+      if (!body || !body.trim()) body = "null";
+
+      const awsUrl = new URL(targetUrl);
+      const canonicalQuery = canonicalQueryString(awsUrl.searchParams);
+
+      const { headers: outHeaders, payloadHash } = await signAwsV4(env, {
+          type: "url",
+          service: "lambda",
+          host: awsUrl.host,
+          path: awsUrl.pathname || "/",
+          method: "POST",
+          body: body,
+          canonicalQuery: canonicalQuery,
+      });
+      outHeaders["Content-Type"] = "application/json";
+      outHeaders["X-Amz-Content-Sha256"] = payloadHash;
+
+      try {
+        const awsResp = await fetch(
+          `https://${awsUrl.host}${awsUrl.pathname}${canonicalQuery ? "?" + canonicalQuery : ""}`,
+          { method: "POST", headers: outHeaders, body }
+        );
+        const respText = await awsResp.text();
+        const respCT = awsResp.headers.get("content-type") || "application/json";
+
+        if (awsResp.status >= 400) {
+          return jsonRes({ proxy_status: awsResp.status, targetUrl, lambda_content_type: respCT, lambda_body: respText.slice(0, 5000) }, awsResp.status);
+        }
+        return new Response(respText, { status: awsResp.status, headers: { "Content-Type": respCT, ...corsHeaders() } });
+      } catch (e) {
+        return jsonRes({ error: String(e?.name || "FetchError"), message: String(e?.message || e) }, 504);
+      }
+    }
+  }
+};
+
+/* ===== 라우팅: 경로에 따라 호출 방식과 대상을 반환 ===== */
+function getRouteInfo(path, env) {
+  switch (path) {
+    case "":
+    case "/meta":
+      return { type: "url", value: env.AWS_FUNCTION_URL_META || null };
+    case "/dcs-hourly":
+      return { type: "invoke", value: env.AWS_FUNCTION_NAME_DCS_HOURLY || "inteco-hos-prod-get-dcs-data" };
+    default:
+      return null;
+  }
+}
+
+/* ===== AWS SigV4 서명 생성 (공통 함수) ===== */
+async function signAwsV4(env, opts) {
+    const region = env.AWS_REGION || "ap-northeast-2";
+    const accessKey = env.AWS_ACCESS_KEY_ID;
+    const secretKey = env.AWS_SECRET_ACCESS_KEY;
+    const sessionToken = env.AWS_SESSION_TOKEN || null;
+
+    const amzdate = toAmzDate(new Date());
+    const datestamp = amzdate.slice(0, 8);
+    const payloadHash = await sha256Hex(opts.body);
+
+    // 서명에 포함될 헤더들 (키는 소문자여야 함)
+    const headersToSign = {
+        "host": opts.host,
+        "x-amz-date": amzdate,
+    };
+    if (opts.type === 'url') {
+        headersToSign["x-amz-content-sha256"] = payloadHash;
+        headersToSign["content-type"] = "application/json";
+    }
+    if (sessionToken) {
+        headersToSign["x-amz-security-token"] = sessionToken;
+    }
+
+    const canonicalHeaders = Object.keys(headersToSign)
+      .sort()
+      .map(k => `${k}:${String(headersToSign[k]).trim()}\n`)
+      .join("");
+
+    const signedHeaders = Object.keys(headersToSign).sort().join(";");
+
+    const canonicalRequest = [ opts.method, opts.path, opts.canonicalQuery || "", canonicalHeaders, signedHeaders, payloadHash ].join("\n");
+    const algorithm = "AWS4-HMAC-SHA256";
+    const credentialScope = `${datestamp}/${region}/${opts.service}/aws4_request`;
+    const stringToSign = [ algorithm, amzdate, credentialScope, await sha256Hex(canonicalRequest) ].join("\n");
+
+    const signingKey = await getSignatureKey(secretKey, datestamp, region, opts.service);
+    const signature = await hmacHex(signingKey, stringToSign);
+
+    // 실제 요청에 사용될 최종 헤더 (키는 보통 Pascal-Case)
+    const finalHeaders = {
+        "Host": opts.host,
+        "X-Amz-Date": amzdate,
+        "Authorization": `${algorithm} Credential=${accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
+        "Path": opts.path, // 커스텀: fetch 호출 시 사용하기 위해 경로 전달
+    };
+    if (sessionToken) {
+        finalHeaders["X-Amz-Security-Token"] = sessionToken;
+    }
+
+    return { headers: finalHeaders, payloadHash };
+}
+
+
+/* ===== 유틸 ===== */
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type,x-api-key,x-amz-security-token,x-debug"
+  };
+}
+function toAmzDate(d) { return d.toISOString().replace(/[:-]|\.\d{3}/g, ""); }
+function rfc3986Encode(str) {
+  return encodeURIComponent(str).replace(/[!'()*]/g, ch => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+function canonicalQueryString(searchParams) {
+  const pairs = [];
+  for (const [k, v] of searchParams.entries()) pairs.push([rfc3986Encode(k), rfc3986Encode(v)]);
+  pairs.sort((a, b) => (a[0] === b[0] ? (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0) : (a[0] < b[0] ? -1 : 1)));
+  return pairs.map(([k, v]) => `${k}=${v}`).join("&");
+}
+function buf2hex(buffer) { return [...new Uint8Array(buffer)].map(b => b.toString(16).padStart(2, "0")).join(""); }
+async function sha256Hex(data) {
+  const enc = typeof data === "string" ? new TextEncoder().encode(data) : data;
+  const hash = await crypto.subtle.digest("SHA-256", enc || new Uint8Array());
+  return buf2hex(hash);
+}
+async function hmac(keyBytes, data) {
+  const enc = new TextEncoder().encode(data);
+  const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", cryptoKey, enc);
+  return new Uint8Array(sig);
+}
+async function hmacHex(keyBytes, data) { return buf2hex(await hmac(keyBytes, data)); }
+async function getSignatureKey(secretKey, dateStamp, regionName, serviceName) {
+  const kDate    = await hmac(new TextEncoder().encode("AWS4" + secretKey), dateStamp);
+  const kRegion  = await hmac(kDate, regionName);
+  const kService = await hmac(kRegion, serviceName);
+  const kSigning = await hmac(kService, "aws4_request");
+  return kSigning;
+}
+function jsonRes(obj, status = 200) {
+  return new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json", ...corsHeaders() } });
+}

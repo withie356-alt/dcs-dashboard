@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  dcs-dashboard:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - dcs-network
+
+  # Supabase (선택사항 - 실시간 업데이트용)
+  supabase-db:
+    image: supabase/postgres:15.1.0.117
+    environment:
+      POSTGRES_PASSWORD: ${SUPABASE_DB_PASSWORD:-your_db_password}
+      POSTGRES_DB: dcs_monitoring
+    volumes:
+      - supabase-data:/var/lib/postgresql/data
+    networks:
+      - dcs-network
+    profiles:
+      - supabase
+
+  supabase-realtime:
+    image: supabase/realtime:v2.25.50
+    depends_on:
+      - supabase-db
+    environment:
+      DB_HOST: supabase-db
+      DB_NAME: dcs_monitoring
+      DB_USER: postgres
+      DB_PASSWORD: ${SUPABASE_DB_PASSWORD:-your_db_password}
+      SECURE_CHANNELS: "false"
+      JWT_SECRET: ${SUPABASE_JWT_SECRET:-your_jwt_secret}
+    networks:
+      - dcs-network
+    profiles:
+      - supabase
+
+networks:
+  dcs-network:
+    driver: bridge
+
+volumes:
+  supabase-data:
