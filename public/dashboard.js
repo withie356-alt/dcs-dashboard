@@ -337,6 +337,30 @@ class Dashboard {
         const grid = document.getElementById('dashboardGrid');
         grid.innerHTML = '';
 
+        // 선택된 태그가 없을 때 안내 메시지 표시
+        if (this.state.selectedTags.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📊</div>
+                    <h3>모니터링할 계기를 선택해주세요</h3>
+                    <p>
+                        좌측 상단의 <strong>☰ 메뉴</strong>를 클릭하여<br>
+                        <strong>레이아웃 관리</strong>에서 저장된 레이아웃을 불러오거나<br>
+                        <strong>계기 선택</strong>에서 모니터링할 계기를 선택하세요
+                    </p>
+                    <div class="empty-state-actions">
+                        <button class="btn btn-primary" onclick="dashboard.openLayoutManager()">
+                            ☰ 레이아웃 관리
+                        </button>
+                        <button class="btn btn-primary" onclick="dashboard.openTagSelector()">
+                            📊 계기 선택
+                        </button>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
         this.state.selectedTags.forEach((tagName, index) => {
             const widget = document.createElement('div');
             widget.className = 'widget';
