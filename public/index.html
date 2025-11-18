@@ -651,6 +651,24 @@
             overflow: hidden;
         }
 
+        .login-header-logos {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 32px 48px;
+            z-index: 2;
+        }
+
+        .login-header-logo {
+            height: 48px;
+            width: auto;
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.2));
+        }
+
         .login-screen::before {
             content: '';
             position: absolute;
@@ -930,6 +948,14 @@
                 font-size: 15px;
             }
 
+            .login-header-logos {
+                padding: 20px 16px;
+            }
+
+            .login-header-logo {
+                height: 32px;
+            }
+
             /* 안내 메시지 */
             .empty-state {
                 padding: 40px 16px;
@@ -1001,6 +1027,14 @@
                 font-size: 14px;
             }
 
+            .login-header-logos {
+                padding: 16px 12px;
+            }
+
+            .login-header-logo {
+                height: 28px;
+            }
+
             /* 안내 메시지 - 작은 화면 */
             .empty-state {
                 padding: 30px 12px;
@@ -1023,6 +1057,10 @@
 <body>
     <!-- 로그인 화면 -->
     <div class="login-screen" id="loginScreen">
+        <div class="login-header-logos">
+            <img src="gs-logo.svg" alt="GS Logo" class="login-header-logo">
+            <img src="52g_logo.svg" alt="52g Logo" class="login-header-logo">
+        </div>
         <div class="login-box">
             <img src="logo.png" alt="위드인천에너지" class="login-logo">
             <h2>DCS 모니터링 시스템</h2>
