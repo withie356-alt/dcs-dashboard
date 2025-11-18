@@ -1,6 +1,11 @@
 class Dashboard {
     constructor() {
-        this.apiBaseUrl = 'http://localhost:3001/api';
+        // 환경에 따라 API URL 자동 설정
+        // localhost에서 실행 시 -> http://localhost:3001/api
+        // Vercel 배포 시 -> 같은 origin의 /api
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        this.apiBaseUrl = isLocalhost ? 'http://localhost:3001/api' : '/api';
+
         this.state = {
             dateFrom: new Date(Date.now() - 3 * 24 * 3600000),
             dateTo: new Date(),

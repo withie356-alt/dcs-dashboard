@@ -48,7 +48,11 @@ app.use(helmet({
 
 // CORS 설정
 app.use(cors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3001'],
+    origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+        'http://localhost:3001',
+        /vercel\.app$/,  // 모든 Vercel 배포 허용
+        /localhost:\d+/   // 모든 localhost 포트 허용
+    ],
     credentials: true
 }));
 
@@ -304,9 +308,16 @@ app.get('/health', (req, res) => {
 
 // 서버 시작
 validateConfig();
-app.listen(PORT, () => {
-    console.log(`\n✅ DCS Dashboard Server running on port ${PORT}`);
-    console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🌐 Cloudflare Worker: ${process.env.CLOUDFLARE_WORKER_URL}`);
-    console.log(`\n🚀 Open http://localhost:${PORT} in your browser\n`);
-});
+
+// Vercel에서는 app을 export하고, 로컬에서는 listen
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`\n✅ DCS Dashboard Server running on port ${PORT}`);
+        console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`🌐 Cloudflare Worker: ${process.env.CLOUDFLARE_WORKER_URL}`);
+        console.log(`\n🚀 Open http://localhost:${PORT} in your browser\n`);
+    });
+}
+
+// Vercel serverless function을 위한 export
+module.exports = app;
