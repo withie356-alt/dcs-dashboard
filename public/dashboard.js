@@ -19,18 +19,65 @@ class Dashboard {
     }
 
     // 로그인
-    login() {
+    async login() {
         const username = document.getElementById('loginUsername').value;
         const password = document.getElementById('loginPassword').value;
         const errorEl = document.getElementById('loginError');
+        const loginBtn = document.querySelector('#loginScreen button');
 
-        if (username === 'admin' && password === 'admin') {
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('mainContainer').style.display = 'block';
-            this.init();
-        } else {
-            errorEl.textContent = '아이디 또는 비밀번호가 올바르지 않습니다.';
+        if (!username || !password) {
+            errorEl.textContent = '아이디와 비밀번호를 입력해주세요.';
             errorEl.style.display = 'block';
+            return;
+        }
+
+        try {
+            // 로딩 상태 표시
+            if (loginBtn) {
+                loginBtn.disabled = true;
+                loginBtn.textContent = '로그인 중...';
+            }
+            errorEl.style.display = 'none';
+
+            // 로그인 API 호출
+            const response = await fetch(`${this.apiBaseUrl}/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // 로그인 성공
+                console.log('✅ 로그인 성공:', result.user.username);
+
+                // 사용자 정보 저장 (localStorage에)
+                localStorage.setItem('user', JSON.stringify(result.user));
+
+                // 화면 전환
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('mainContainer').style.display = 'block';
+
+                // 대시보드 초기화
+                this.init();
+            } else {
+                // 로그인 실패
+                errorEl.textContent = result.message || '로그인에 실패했습니다.';
+                errorEl.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('로그인 오류:', error);
+            errorEl.textContent = '로그인 처리 중 오류가 발생했습니다.';
+            errorEl.style.display = 'block';
+        } finally {
+            // 로딩 상태 해제
+            if (loginBtn) {
+                loginBtn.disabled = false;
+                loginBtn.textContent = '로그인';
+            }
         }
     }
 
@@ -90,18 +137,16 @@ class Dashboard {
         }
     }
 
-    // 메타데이터 강제 새로고침
+    // 메타데이터 강제 새로고침 (API에서 최신 데이터 가져오기)
     async refreshMetadata() {
-        const footerBtn = document.getElementById('refreshMetaBtn');
         const headerBtn = document.getElementById('refreshMetaHeaderBtn');
         const container = document.getElementById('tagListContainer');
 
-        if (footerBtn) footerBtn.classList.add('loading');
         if (headerBtn) headerBtn.classList.add('loading');
         container.innerHTML = '<div style="text-align: center; padding: 40px; color: #86868B;">API에서 최신 목록을 가져오는 중...</div>';
 
         try {
-            await this.loadMetadata(true); // force refresh
+            await this.loadMetadata(true); // force refresh = true로 API 호출
 
             if (this.state.availableTagsData.length > 0) {
                 this.displayAvailableTags();
@@ -113,7 +158,6 @@ class Dashboard {
             console.error('새로고침 실패:', error);
             this.showNotification('새로고침에 실패했습니다.', 'error');
         } finally {
-            if (footerBtn) footerBtn.classList.remove('loading');
             if (headerBtn) headerBtn.classList.remove('loading');
         }
     }

@@ -16,7 +16,12 @@
       "Bash(npm install:*)",
       "Bash(timeout /t 2)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nInitial commit: DCS Dashboard with Supabase integration\n\n- Real-time DCS monitoring dashboard\n- Cloudflare Workers + AWS Lambda integration\n- Supabase caching for metadata\n- Wide to Long format data transformation\n- Tag selection and saving functionality\n- Responsive design with Chart.js\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git branch:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

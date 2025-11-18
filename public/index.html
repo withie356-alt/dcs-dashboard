@@ -607,7 +607,7 @@
                     <h2 class="modal-title" style="margin-bottom: 4px;">계기 선택</h2>
                     <div id="metaLastUpdated" style="font-size: 11px; color: #86868B;">캐시 없음</div>
                 </div>
-                <button class="btn btn-primary" style="margin-right: 12px; height: 36px; padding: 8px 16px; font-size: 13px;" onclick="dashboard.refreshMetadata()" id="refreshMetaHeaderBtn">📥 목록 가져오기</button>
+                <button class="btn btn-primary" style="margin-right: 12px; height: 36px; padding: 8px 16px; font-size: 13px;" onclick="dashboard.refreshMetadata()" id="refreshMetaHeaderBtn">🔄 목록 업데이트</button>
                 <button class="close-btn" onclick="dashboard.closeModal('tagSelectorModal')">×</button>
             </div>
 
@@ -626,8 +626,7 @@
             <div class="modal-actions">
                 <button class="btn btn-primary" onclick="dashboard.selectAllTags()">전체 선택</button>
                 <button class="btn btn-primary" onclick="dashboard.clearAllTags()">전체 해제</button>
-                <button class="btn" style="margin-left: auto; background: rgba(120,120,128,0.12); color: #1D1D1F;" onclick="dashboard.refreshMetadata()" id="refreshMetaBtn">🔄 API 새로고침</button>
-                <button class="btn btn-primary" onclick="dashboard.applySelectedTags()">적용</button>
+                <button class="btn btn-primary" style="margin-left: auto;" onclick="dashboard.applySelectedTags()">적용</button>
             </div>
         </div>
     </div>

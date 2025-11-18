@@ -7,6 +7,7 @@ const helmet = require('helmet');
 const path = require('path');
 const fs = require('fs').promises;
 const { createClient } = require('@supabase/supabase-js');
+const bcrypt = require('bcrypt');
 
 // 환경변수 로드
 dotenv.config();
@@ -81,6 +82,77 @@ function validateConfig() {
 
     console.log('✅ Configuration validated');
 }
+
+// 로그인 API
+app.post('/api/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+
+        if (!username || !password) {
+            return res.status(400).json({
+                success: false,
+                message: '아이디와 비밀번호를 입력해주세요.'
+            });
+        }
+
+        if (!supabase) {
+            return res.status(500).json({
+                success: false,
+                message: 'Supabase가 설정되지 않았습니다.'
+            });
+        }
+
+        // Supabase에서 사용자 조회
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('username', username)
+            .single();
+
+        if (error || !user) {
+            console.log('❌ 로그인 실패: 사용자를 찾을 수 없음');
+            return res.status(401).json({
+                success: false,
+                message: '아이디 또는 비밀번호가 올바르지 않습니다.'
+            });
+        }
+
+        // 비밀번호 확인
+        const passwordMatch = await bcrypt.compare(password, user.password_hash);
+
+        if (!passwordMatch) {
+            console.log('❌ 로그인 실패: 비밀번호 불일치');
+            return res.status(401).json({
+                success: false,
+                message: '아이디 또는 비밀번호가 올바르지 않습니다.'
+            });
+        }
+
+        // 마지막 로그인 시간 업데이트
+        await supabase
+            .from('users')
+            .update({ last_login: new Date().toISOString() })
+            .eq('id', user.id);
+
+        console.log(`✅ 로그인 성공: ${username}`);
+
+        res.json({
+            success: true,
+            message: '로그인 성공',
+            user: {
+                id: user.id,
+                username: user.username
+            }
+        });
+    } catch (error) {
+        console.error('Login error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: '로그인 처리 중 오류가 발생했습니다.',
+            error: error.message
+        });
+    }
+});
 
 // 메타데이터 API
 app.get('/api/meta', async (req, res) => {
