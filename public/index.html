@@ -767,6 +767,7 @@
             text-align: center;
             padding: 80px 20px;
             color: #86868B;
+            grid-column: 1 / -1;
         }
 
         .empty-state-icon {
@@ -800,11 +801,10 @@
         }
 
         .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
             min-height: 400px;
-            position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
         }
 
         /* 모바일 반응형 */
@@ -867,6 +867,10 @@
 
             .widget {
                 min-height: auto;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
             }
 
             /* 로그인 화면 */
