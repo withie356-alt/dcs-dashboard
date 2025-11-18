@@ -785,12 +785,11 @@ class Dashboard {
 
         if (draggedTag === targetTag) return;
 
-        // selectedTags 배열 순서 변경
-        const draggedIndex = this.state.selectedTags.indexOf(draggedTag);
-        const targetIndex = this.state.selectedTags.indexOf(targetTag);
+        // DOM 순서를 기반으로 selectedTags 배열 순서 변경
+        const widgets = [...document.querySelectorAll('.widget')];
+        this.state.selectedTags = widgets.map(w => w.getAttribute('data-tag'));
 
-        this.state.selectedTags.splice(draggedIndex, 1);
-        this.state.selectedTags.splice(targetIndex, 0, draggedTag);
+        console.log('🖱️ 데스크톱 드래그 완료, 새로운 순서:', this.state.selectedTags);
 
         // 위젯 재렌더링
         this.renderWidgets();
