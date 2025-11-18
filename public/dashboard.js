@@ -8,6 +8,33 @@ class Dashboard {
             availableTagsData: [],
             chartData: new Map()
         };
+
+        // 저장된 로그인 확인 및 자동 로그인
+        this.checkSavedLogin();
+    }
+
+    // 저장된 로그인 상태 확인
+    checkSavedLogin() {
+        const savedUser = localStorage.getItem('savedUser');
+        if (savedUser) {
+            try {
+                const user = JSON.parse(savedUser);
+                console.log('✅ 저장된 로그인 정보 발견:', user.username);
+
+                // 사용자 정보 복원
+                localStorage.setItem('user', savedUser);
+
+                // 로그인 화면 숨기고 대시보드 표시
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('mainContainer').style.display = 'block';
+
+                // 대시보드 초기화
+                this.init();
+            } catch (error) {
+                console.error('저장된 로그인 정보 로드 실패:', error);
+                localStorage.removeItem('savedUser');
+            }
+        }
     }
 
     async init() {
@@ -54,8 +81,19 @@ class Dashboard {
                 // 로그인 성공
                 console.log('✅ 로그인 성공:', result.user.username);
 
-                // 사용자 정보 저장 (localStorage에)
+                // 사용자 정보 저장
                 localStorage.setItem('user', JSON.stringify(result.user));
+
+                // 로그인 상태 유지 체크 확인
+                const rememberMe = document.getElementById('rememberMe').checked;
+                if (rememberMe) {
+                    // 로그인 정보를 영구 저장
+                    localStorage.setItem('savedUser', JSON.stringify(result.user));
+                    console.log('💾 로그인 상태 저장됨');
+                } else {
+                    // 저장된 로그인 정보 제거
+                    localStorage.removeItem('savedUser');
+                }
 
                 // 화면 전환
                 document.getElementById('loginScreen').style.display = 'none';

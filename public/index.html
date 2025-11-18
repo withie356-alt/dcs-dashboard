@@ -567,6 +567,10 @@
                    onkeypress="if(event.key==='Enter') dashboard.login()">
             <input type="password" id="loginPassword" placeholder="비밀번호" class="login-input"
                    onkeypress="if(event.key==='Enter') dashboard.login()">
+            <label style="display: flex; align-items: center; gap: 8px; margin: 12px 0; font-size: 13px; color: white; cursor: pointer;">
+                <input type="checkbox" id="rememberMe" style="width: auto; margin: 0;">
+                로그인 상태 유지
+            </label>
             <button class="btn btn-primary" style="width: 100%;" onclick="dashboard.login()">로그인</button>
             <div id="loginError"></div>
         </div>

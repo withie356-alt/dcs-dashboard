@@ -7,8 +7,14 @@ async function createAdminUser() {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_ANON_KEY;
 
-    if (!supabaseUrl || !supabaseKey) {
-        console.error('❌ .env 파일에 SUPABASE_URL과 SUPABASE_ANON_KEY를 설정해주세요.');
+    // URL 검증
+    const isValidUrl = supabaseUrl && supabaseUrl.startsWith('http') && supabaseUrl.includes('supabase');
+
+    if (!isValidUrl || !supabaseKey || supabaseKey === 'your_supabase_anon_key_here') {
+        console.error('❌ .env 파일에 유효한 SUPABASE_URL과 SUPABASE_ANON_KEY를 설정해주세요.');
+        console.log('현재 설정:');
+        console.log('  SUPABASE_URL:', supabaseUrl || '(없음)');
+        console.log('  SUPABASE_ANON_KEY:', supabaseKey ? '***' : '(없음)');
         process.exit(1);
     }
 
