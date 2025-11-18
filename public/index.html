@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>DCS 실시간 모니터링</title>
+    <title>DCS 모니터링 시스템</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -1026,7 +1026,7 @@
         <div class="login-box">
             <img src="logo.png" alt="위드인천에너지" class="login-logo">
             <h2>DCS 모니터링</h2>
-            <p class="login-subtitle">위드인천에너지 실시간 모니터링 시스템</p>
+            <p class="login-subtitle">위드인천에너지 모니터링 시스템</p>
             <input type="text" id="loginUsername" value="admin" class="login-input" placeholder="아이디">
             <input type="password" id="loginPassword" value="" class="login-input" placeholder="비밀번호">
             <button class="login-btn" onclick="dashboard.login()">로그인</button>
@@ -1047,7 +1047,7 @@
             <!-- 드롭다운 메뉴 -->
             <div class="header-dropdown" id="headerDropdown">
                 <div class="dropdown-date-row">
-                    <div class="dropdown-date-label">데이터 기간</div>
+                    <div class="dropdown-date-label">데이터 기간 <span style="color: #86868B;">| 최대 30일</span></div>
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <input type="date" id="dateFrom" onchange="dashboard.onDateChange()" style="flex: 1; padding: 8px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 13px;">
                         <span style="color: #86868B;">~</span>
