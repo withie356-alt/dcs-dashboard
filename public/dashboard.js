@@ -41,6 +41,7 @@ class Dashboard {
                 console.log('🔐 자동 로그인:', username);
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('mainContainer').style.display = 'block';
+                window.scrollTo(0, 0);
                 this.init();
             } else {
                 // 만료되었으면 localStorage 삭제
@@ -120,6 +121,9 @@ class Dashboard {
                 // 화면 전환
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('mainContainer').style.display = 'block';
+
+                // 스크롤을 맨 위로 이동
+                window.scrollTo(0, 0);
 
                 // 대시보드 초기화
                 this.init();
