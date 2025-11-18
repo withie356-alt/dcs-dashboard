@@ -81,6 +81,9 @@ class Dashboard {
         // 메타데이터 미리 로드
         await this.loadMetadata(false);
 
+        // 위젯 렌더링 (선택된 태그가 없으면 안내 메시지 표시)
+        this.renderWidgets();
+
         console.log('✅ DCS 대시보드 준비 완료');
     }
 
