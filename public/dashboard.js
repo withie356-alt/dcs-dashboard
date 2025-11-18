@@ -52,6 +52,20 @@ class Dashboard {
         console.log('👋 로그아웃 완료');
     }
 
+    // 헤더 토글
+    toggleHeader() {
+        const header = document.getElementById('mainHeader');
+        const toggleBtn = document.getElementById('headerToggle');
+
+        header.classList.toggle('collapsed');
+
+        if (header.classList.contains('collapsed')) {
+            toggleBtn.textContent = '▼';
+        } else {
+            toggleBtn.textContent = '▲';
+        }
+    }
+
     async init() {
         // 날짜 초기화
         document.getElementById('dateFrom').value = this.formatDate(this.state.dateFrom);

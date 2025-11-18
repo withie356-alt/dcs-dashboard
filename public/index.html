@@ -37,6 +37,45 @@
             padding: 24px;
             margin-bottom: 20px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .header.collapsed {
+            padding: 8px;
+            margin-bottom: 8px;
+        }
+
+        .header.collapsed .header-content {
+            display: none;
+        }
+
+        .header-toggle {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(0, 122, 255, 0.1);
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #007AFF;
+            transition: all 0.2s;
+            z-index: 10;
+        }
+
+        .header-toggle:hover {
+            background: rgba(0, 122, 255, 0.2);
+        }
+
+        .header.collapsed .header-toggle {
+            position: static;
+            margin: 0 auto;
         }
 
         .header-row {
@@ -682,24 +721,27 @@
 
     <!-- 메인 대시보드 -->
     <div class="container" id="mainContainer" style="display: none;">
-        <div class="header">
-            <div class="header-row">
-                <h1>DCS 실시간 모니터링</h1>
-                <div class="date-selector">
-                    <input type="date" id="dateFrom" onchange="dashboard.onDateChange()">
-                    <span class="date-separator">-</span>
-                    <input type="date" id="dateTo" onchange="dashboard.onDateChange()">
+        <div class="header" id="mainHeader">
+            <button class="header-toggle" onclick="dashboard.toggleHeader()" id="headerToggle">▲</button>
+            <div class="header-content">
+                <div class="header-row">
+                    <h1>DCS 실시간 모니터링</h1>
+                    <div class="date-selector">
+                        <input type="date" id="dateFrom" onchange="dashboard.onDateChange()">
+                        <span class="date-separator">-</span>
+                        <input type="date" id="dateTo" onchange="dashboard.onDateChange()">
+                    </div>
                 </div>
-            </div>
 
-            <div class="controls-row">
-                <button class="btn btn-primary" onclick="dashboard.openLayoutManager()" style="padding: 10px 14px;">☰</button>
-                <button class="btn btn-primary" onclick="dashboard.openTagSelector()">계기 선택</button>
-                <button class="btn btn-primary" onclick="dashboard.refreshData()" id="refreshBtn">새로고침</button>
-                <button class="btn" onclick="dashboard.logout()" style="background: #F5F5F7; color: #86868B; padding: 10px 14px;" title="로그아웃">🚪</button>
-                <div class="time-display" id="timeDisplay">
-                    <div class="status-dot"></div>
-                    <span id="currentDateTime">--</span>
+                <div class="controls-row">
+                    <button class="btn btn-primary" onclick="dashboard.openLayoutManager()" style="padding: 10px 14px;">☰</button>
+                    <button class="btn btn-primary" onclick="dashboard.openTagSelector()">계기 선택</button>
+                    <button class="btn btn-primary" onclick="dashboard.refreshData()" id="refreshBtn">새로고침</button>
+                    <button class="btn" onclick="dashboard.logout()" style="background: #F5F5F7; color: #86868B; padding: 10px 14px;" title="로그아웃">⏻</button>
+                    <div class="time-display" id="timeDisplay">
+                        <div class="status-dot"></div>
+                        <span id="currentDateTime">--</span>
+                    </div>
                 </div>
             </div>
         </div>
