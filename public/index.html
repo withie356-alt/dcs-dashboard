@@ -122,6 +122,7 @@
             font-family: inherit;
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 6px;
             transition: all 0.2s;
             height: 40px;
@@ -614,25 +615,30 @@
             /* 태그 선택 모달 */
             .modal-content {
                 max-width: 95vw !important;
-                margin: 20px;
+                width: 95%;
+                margin: 10px auto;
+            }
+
+            .modal-body {
+                padding: 16px;
             }
 
             .tag-item {
-                padding: 10px;
+                padding: 8px;
             }
 
             .tag-item-name {
-                font-size: 13px;
+                font-size: 12px;
                 word-break: break-word;
             }
 
             .tag-item-desc {
-                font-size: 11px;
+                font-size: 10px;
                 word-break: break-word;
             }
 
             .company-tags-grid {
-                grid-template-columns: 1fr;
+                gap: 8px;
             }
 
             .widget {
