@@ -935,18 +935,22 @@ class Dashboard {
             return true;
         }
 
-        // 위치 교환
+        // 위치 이동 (교환이 아닌 삽입 방식)
         const selectedTag = this.state.selectedWidget.getAttribute('data-tag');
         const targetTag = targetWidget.getAttribute('data-tag');
 
         const selectedIndex = this.state.selectedTags.indexOf(selectedTag);
         const targetIndex = this.state.selectedTags.indexOf(targetTag);
 
-        // 배열에서 위치 교환
-        this.state.selectedTags[selectedIndex] = targetTag;
-        this.state.selectedTags[targetIndex] = selectedTag;
+        // 배열에서 선택한 위젯 제거
+        this.state.selectedTags.splice(selectedIndex, 1);
 
-        console.log('📱 위젯 이동:', selectedTag, '→', targetIndex);
+        // 타겟 위치에 삽입 (제거 후 인덱스 재조정)
+        // selectedIndex < targetIndex인 경우, 제거로 인해 targetIndex가 1 감소
+        const newTargetIndex = selectedIndex < targetIndex ? targetIndex - 1 : targetIndex;
+        this.state.selectedTags.splice(newTargetIndex, 0, selectedTag);
+
+        console.log('📱 위젯 이동:', selectedTag, '→ 위치', newTargetIndex, ', 새 순서:', this.state.selectedTags);
 
         // 선택 해제
         this.clearWidgetSelection();
