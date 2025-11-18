@@ -16,6 +16,15 @@ class Dashboard {
 
         // 자동 로그인 체크
         this.checkAutoLogin();
+
+        // 메뉴 외부 클릭시 닫기
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('headerDropdown');
+            const menuBtn = document.getElementById('menuBtn');
+            if (dropdown && menuBtn && !dropdown.contains(e.target) && !menuBtn.contains(e.target)) {
+                dropdown.classList.remove('active');
+            }
+        });
     }
 
     // 자동 로그인 체크 (7일 유효)
@@ -52,18 +61,16 @@ class Dashboard {
         console.log('👋 로그아웃 완료');
     }
 
-    // 헤더 토글
-    toggleHeader() {
-        const header = document.getElementById('mainHeader');
-        const toggleBtn = document.getElementById('headerToggle');
+    // 메뉴 토글
+    toggleMenu() {
+        const dropdown = document.getElementById('headerDropdown');
+        dropdown.classList.toggle('active');
+    }
 
-        header.classList.toggle('collapsed');
-
-        if (header.classList.contains('collapsed')) {
-            toggleBtn.textContent = '▼';
-        } else {
-            toggleBtn.textContent = '▲';
-        }
+    // 메뉴 닫기
+    closeMenu() {
+        const dropdown = document.getElementById('headerDropdown');
+        dropdown.classList.remove('active');
     }
 
     async init() {

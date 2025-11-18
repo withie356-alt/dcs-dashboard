@@ -34,56 +34,89 @@
         .header {
             background: white;
             border-radius: 16px;
-            padding: 24px;
+            padding: 16px 24px;
             margin-bottom: 20px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
             position: relative;
         }
 
-        .header.collapsed {
-            padding: 8px;
-            margin-bottom: 8px;
-        }
-
-        .header.collapsed .header-content {
-            display: none;
-        }
-
-        .header-toggle {
-            position: absolute;
-            top: 12px;
-            right: 12px;
+        .header-menu-btn {
             background: rgba(0, 122, 255, 0.1);
             border: none;
-            width: 32px;
-            height: 32px;
+            width: 40px;
+            height: 40px;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #007AFF;
             transition: all 0.2s;
-            z-index: 10;
+            flex-shrink: 0;
         }
 
-        .header-toggle:hover {
+        .header-menu-btn:hover {
             background: rgba(0, 122, 255, 0.2);
         }
 
-        .header.collapsed .header-toggle {
-            position: static;
-            margin: 0 auto;
+        .header-dropdown {
+            position: absolute;
+            top: 60px;
+            left: 24px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            padding: 8px;
+            min-width: 250px;
+            z-index: 1000;
+            display: none;
         }
 
-        .header-row {
+        .header-dropdown.active {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
-            gap: 16px;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
+            gap: 8px;
+            font-size: 14px;
+            color: #1D1D1F;
+            border: none;
+            background: transparent;
+            width: 100%;
+            text-align: left;
+        }
+
+        .dropdown-item:hover {
+            background: #F5F5F7;
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background: #E5E5EA;
+            margin: 4px 0;
+        }
+
+        .dropdown-date-row {
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .dropdown-date-label {
+            font-size: 12px;
+            color: #86868B;
+            font-weight: 600;
         }
 
         h1 {
@@ -722,27 +755,37 @@
     <!-- 메인 대시보드 -->
     <div class="container" id="mainContainer" style="display: none;">
         <div class="header" id="mainHeader">
-            <button class="header-toggle" onclick="dashboard.toggleHeader()" id="headerToggle">▲</button>
-            <div class="header-content">
-                <div class="header-row">
-                    <h1>DCS 실시간 모니터링</h1>
-                    <div class="date-selector">
-                        <input type="date" id="dateFrom" onchange="dashboard.onDateChange()">
-                        <span class="date-separator">-</span>
-                        <input type="date" id="dateTo" onchange="dashboard.onDateChange()">
-                    </div>
-                </div>
+            <button class="header-menu-btn" onclick="dashboard.toggleMenu()" id="menuBtn">☰</button>
+            <h1>DCS 모니터링</h1>
+            <div class="time-display" id="timeDisplay" style="margin-left: auto;">
+                <div class="status-dot"></div>
+                <span id="currentDateTime">--</span>
+            </div>
 
-                <div class="controls-row">
-                    <button class="btn btn-primary" onclick="dashboard.openLayoutManager()" style="padding: 10px 14px;">☰</button>
-                    <button class="btn btn-primary" onclick="dashboard.openTagSelector()">계기 선택</button>
-                    <button class="btn btn-primary" onclick="dashboard.refreshData()" id="refreshBtn">새로고침</button>
-                    <button class="btn" onclick="dashboard.logout()" style="background: #F5F5F7; color: #86868B; padding: 10px 14px;" title="로그아웃">⏻</button>
-                    <div class="time-display" id="timeDisplay">
-                        <div class="status-dot"></div>
-                        <span id="currentDateTime">--</span>
+            <!-- 드롭다운 메뉴 -->
+            <div class="header-dropdown" id="headerDropdown">
+                <div class="dropdown-date-row">
+                    <div class="dropdown-date-label">데이터 기간</div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="date" id="dateFrom" onchange="dashboard.onDateChange()" style="flex: 1; padding: 8px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 13px;">
+                        <span style="color: #86868B;">~</span>
+                        <input type="date" id="dateTo" onchange="dashboard.onDateChange()" style="flex: 1; padding: 8px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 13px;">
                     </div>
                 </div>
+                <div class="dropdown-divider"></div>
+                <button class="dropdown-item" onclick="dashboard.openLayoutManager(); dashboard.closeMenu();">
+                    ☰ 레이아웃 관리
+                </button>
+                <button class="dropdown-item" onclick="dashboard.openTagSelector(); dashboard.closeMenu();">
+                    📊 계기 선택
+                </button>
+                <button class="dropdown-item" onclick="dashboard.refreshData(); dashboard.closeMenu();">
+                    🔄 새로고침
+                </button>
+                <div class="dropdown-divider"></div>
+                <button class="dropdown-item" onclick="dashboard.logout();" style="color: #FF3B30;">
+                    로그아웃
+                </button>
             </div>
         </div>
 
