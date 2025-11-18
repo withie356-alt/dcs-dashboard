@@ -13,6 +13,43 @@ class Dashboard {
             editMode: false,
             draggedElement: null
         };
+
+        // 자동 로그인 체크
+        this.checkAutoLogin();
+    }
+
+    // 자동 로그인 체크 (7일 유효)
+    checkAutoLogin() {
+        const loginData = localStorage.getItem('dcs_login');
+        if (!loginData) return;
+
+        try {
+            const { username, expiresAt } = JSON.parse(loginData);
+            const now = new Date().getTime();
+
+            // 만료되지 않았으면 자동 로그인
+            if (now < expiresAt) {
+                console.log('🔐 자동 로그인:', username);
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('mainContainer').style.display = 'block';
+                this.init();
+            } else {
+                // 만료되었으면 localStorage 삭제
+                console.log('⏰ 로그인 세션 만료 (7일 경과)');
+                localStorage.removeItem('dcs_login');
+            }
+        } catch (error) {
+            console.error('자동 로그인 실패:', error);
+            localStorage.removeItem('dcs_login');
+        }
+    }
+
+    // 로그아웃
+    logout() {
+        localStorage.removeItem('dcs_login');
+        document.getElementById('loginScreen').style.display = 'flex';
+        document.getElementById('mainContainer').style.display = 'none';
+        console.log('👋 로그아웃 완료');
     }
 
     async init() {
@@ -47,6 +84,14 @@ class Dashboard {
 
             if (result.success) {
                 console.log('✅ 로그인 성공!');
+
+                // 로그인 정보를 localStorage에 저장 (7일 유효)
+                const expiresAt = new Date().getTime() + (7 * 24 * 60 * 60 * 1000); // 7일
+                localStorage.setItem('dcs_login', JSON.stringify({
+                    username: username,
+                    expiresAt: expiresAt
+                }));
+                console.log('💾 로그인 세션 저장 (7일간 유효)');
 
                 // 화면 전환
                 document.getElementById('loginScreen').style.display = 'none';
