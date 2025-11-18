@@ -622,17 +622,53 @@
         .login-screen::before {
             content: '';
             position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            animation: rotate 20s linear infinite;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                radial-gradient(2px 2px at 20% 30%, white, transparent),
+                radial-gradient(2px 2px at 60% 70%, white, transparent),
+                radial-gradient(1px 1px at 50% 50%, white, transparent),
+                radial-gradient(1px 1px at 80% 10%, white, transparent),
+                radial-gradient(2px 2px at 90% 60%, white, transparent),
+                radial-gradient(1px 1px at 33% 80%, white, transparent),
+                radial-gradient(2px 2px at 15% 90%, white, transparent);
+            background-size: 200% 200%;
+            background-position: 0% 0%;
+            animation: stars 3s ease-in-out infinite alternate;
         }
 
-        @keyframes rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+        .login-screen::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.8), transparent),
+                radial-gradient(2px 2px at 70% 40%, rgba(255,255,255,0.6), transparent),
+                radial-gradient(1px 1px at 40% 60%, rgba(255,255,255,0.9), transparent),
+                radial-gradient(1px 1px at 85% 80%, rgba(255,255,255,0.7), transparent),
+                radial-gradient(2px 2px at 25% 45%, rgba(255,255,255,0.5), transparent);
+            background-size: 200% 200%;
+            background-position: 0% 0%;
+            animation: stars 4s ease-in-out infinite alternate-reverse;
+        }
+
+        @keyframes stars {
+            0% {
+                background-position: 0% 0%;
+                opacity: 0.3;
+            }
+            50% {
+                opacity: 1;
+            }
+            100% {
+                background-position: 100% 100%;
+                opacity: 0.3;
+            }
         }
 
         @keyframes float {
@@ -649,13 +685,12 @@
             max-width: 420px;
             position: relative;
             z-index: 1;
-            animation: float 6s ease-in-out infinite;
         }
 
         .login-logo {
-            width: 180px;
+            width: 120px;
             height: auto;
-            margin: 0 auto 24px;
+            margin: 0 auto 20px;
             display: block;
         }
 
