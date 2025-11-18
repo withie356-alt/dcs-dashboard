@@ -17,7 +17,8 @@ class Dashboard {
             touchStartY: 0,
             touchTimer: null,
             isTouching: false,
-            touchElement: null
+            touchElement: null,
+            selectedWidget: null  // 모바일에서 선택된 위젯
         };
 
         // 자동 로그인 체크
@@ -29,6 +30,11 @@ class Dashboard {
             const menuBtn = document.getElementById('menuBtn');
             if (dropdown && menuBtn && !dropdown.contains(e.target) && !menuBtn.contains(e.target)) {
                 dropdown.classList.remove('active');
+            }
+
+            // 위젯 외부 클릭 시 선택 해제
+            if (!e.target.closest('.widget')) {
+                this.clearWidgetSelection();
             }
         });
     }
@@ -394,9 +400,16 @@ class Dashboard {
             widget.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
             widget.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: false });
 
-            // 클릭 이벤트 (드래그 중이 아닐 때만)
+            // 클릭 이벤트
             widget.addEventListener('click', (e) => {
-                if (!this.state.draggedElement && !this.state.isTouching) {
+                // 데스크톱 드래그 중이면 무시
+                if (this.state.draggedElement) {
+                    return;
+                }
+
+                // 모바일 위젯 선택/이동 처리
+                const shouldOpenModal = this.handleWidgetClick(widget);
+                if (shouldOpenModal) {
                     this.openChartModal(tagName);
                 }
             });
@@ -428,6 +441,24 @@ class Dashboard {
 
             grid.appendChild(widget);
         });
+
+        // 선택 상태 복원 (모바일)
+        if (this.state.selectedWidget) {
+            const selectedTag = this.state.selectedWidget.getAttribute('data-tag');
+            const newSelectedWidget = document.querySelector(`[data-tag="${selectedTag}"]`);
+
+            if (newSelectedWidget) {
+                this.state.selectedWidget = newSelectedWidget;
+                newSelectedWidget.classList.add('selected');
+
+                // 다른 위젯들을 타겟으로 표시
+                document.querySelectorAll('.widget').forEach(w => {
+                    if (w !== newSelectedWidget) {
+                        w.classList.add('target');
+                    }
+                });
+            }
+        }
     }
 
     // 위젯 삭제
@@ -830,58 +861,50 @@ class Dashboard {
         }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
 
-    // ==================== 터치 드래그 (모바일) ====================
+    // ==================== 터치 선택 (모바일) ====================
 
     handleTouchStart(e) {
         const widget = e.currentTarget;
         this.state.touchElement = widget;
         this.state.touchStartX = e.touches[0].clientX;
         this.state.touchStartY = e.touches[0].clientY;
-        this.state.isTouching = false;
 
         // 500ms 롱프레스 감지
         this.state.touchTimer = setTimeout(() => {
-            this.state.isTouching = true;
-            this.state.draggedElement = widget;
-            widget.classList.add('dragging');
+            // 이미 선택된 위젯이 있으면 선택 해제
+            if (this.state.selectedWidget) {
+                this.clearWidgetSelection();
+            }
 
-            // 햅틱 피드백 (지원하는 경우)
+            // 새로운 위젯 선택
+            this.state.selectedWidget = widget;
+            widget.classList.add('selected');
+
+            // 다른 모든 위젯을 타겟으로 표시
+            document.querySelectorAll('.widget').forEach(w => {
+                if (w !== widget) {
+                    w.classList.add('target');
+                }
+            });
+
+            // 햅틱 피드백
             if (navigator.vibrate) {
                 navigator.vibrate(50);
             }
 
-            console.log('📱 모바일 드래그 시작:', widget.getAttribute('data-tag'));
+            console.log('📱 위젯 선택됨:', widget.getAttribute('data-tag'));
         }, 500);
     }
 
     handleTouchMove(e) {
-        if (!this.state.isTouching || !this.state.draggedElement) {
-            // 아직 롱프레스가 아니면 타이머 취소 (스크롤 중)
+        // 터치가 움직이면 선택 취소 (스크롤 중)
+        const moveX = Math.abs(e.touches[0].clientX - this.state.touchStartX);
+        const moveY = Math.abs(e.touches[0].clientY - this.state.touchStartY);
+
+        if (moveX > 10 || moveY > 10) {
             if (this.state.touchTimer) {
                 clearTimeout(this.state.touchTimer);
                 this.state.touchTimer = null;
-            }
-            return;
-        }
-
-        e.preventDefault(); // 스크롤 방지
-
-        const touch = e.touches[0];
-        const currentX = touch.clientX;
-        const currentY = touch.clientY;
-
-        // 터치 위치에 있는 위젯 찾기
-        const elementBelow = document.elementFromPoint(currentX, currentY);
-        const widgetBelow = elementBelow?.closest('.widget');
-
-        if (widgetBelow && widgetBelow !== this.state.draggedElement) {
-            const container = this.state.draggedElement.parentElement;
-            const afterElement = this.getDragAfterElement(container, currentY);
-
-            if (afterElement == null) {
-                container.appendChild(this.state.draggedElement);
-            } else {
-                container.insertBefore(this.state.draggedElement, afterElement);
             }
         }
     }
@@ -892,49 +915,74 @@ class Dashboard {
             clearTimeout(this.state.touchTimer);
             this.state.touchTimer = null;
         }
+    }
 
-        // 드래그 중이었으면 순서 변경 적용
-        if (this.state.isTouching && this.state.draggedElement) {
-            e.preventDefault(); // 클릭 이벤트 방지
+    // 위젯 클릭 시 이동 처리
+    handleWidgetClick(targetWidget) {
+        if (!this.state.selectedWidget) {
+            // 선택된 위젯이 없으면 차트 모달 열기
+            return true;
+        }
 
-            // 새로운 순서로 selectedTags 업데이트
-            const widgets = [...document.querySelectorAll('.widget')];
-            this.state.selectedTags = widgets.map(w => w.getAttribute('data-tag'));
+        // 선택된 위젯과 같으면 선택 해제
+        if (this.state.selectedWidget === targetWidget) {
+            this.clearWidgetSelection();
+            return false;
+        }
 
-            console.log('📱 모바일 드래그 완료, 새로운 순서:', this.state.selectedTags);
+        // 타겟 위젯이 아니면 무시
+        if (!targetWidget.classList.contains('target')) {
+            return true;
+        }
 
-            // UI 정리
-            this.state.draggedElement.classList.remove('dragging');
-            document.querySelectorAll('.widget').forEach(w => w.classList.remove('drag-over'));
+        // 위치 교환
+        const selectedTag = this.state.selectedWidget.getAttribute('data-tag');
+        const targetTag = targetWidget.getAttribute('data-tag');
 
-            // 위젯 재렌더링
-            this.renderWidgets();
+        const selectedIndex = this.state.selectedTags.indexOf(selectedTag);
+        const targetIndex = this.state.selectedTags.indexOf(targetTag);
 
-            // 캐시된 데이터로 현재 값 복원
-            for (const [tagName, items] of this.state.chartData.entries()) {
-                if (items && items.length > 0) {
-                    const lastValue = items[items.length - 1].tag_val;
-                    const valueEl = document.getElementById(`value-${tagName}`);
-                    if (valueEl) {
-                        valueEl.textContent = Number(lastValue).toFixed(2);
-                    }
+        // 배열에서 위치 교환
+        this.state.selectedTags[selectedIndex] = targetTag;
+        this.state.selectedTags[targetIndex] = selectedTag;
 
-                    const unitEl = document.getElementById(`unit-${tagName}`);
-                    if (unitEl) {
-                        unitEl.textContent = this.getUnit(tagName);
-                    }
+        console.log('📱 위젯 이동:', selectedTag, '→', targetIndex);
+
+        // 선택 해제
+        this.clearWidgetSelection();
+
+        // 위젯 재렌더링
+        this.renderWidgets();
+
+        // 캐시된 데이터로 현재 값 복원
+        for (const [tagName, items] of this.state.chartData.entries()) {
+            if (items && items.length > 0) {
+                const lastValue = items[items.length - 1].tag_val;
+                const valueEl = document.getElementById(`value-${tagName}`);
+                if (valueEl) {
+                    valueEl.textContent = Number(lastValue).toFixed(2);
+                }
+
+                const unitEl = document.getElementById(`unit-${tagName}`);
+                if (unitEl) {
+                    unitEl.textContent = this.getUnit(tagName);
                 }
             }
         }
 
-        // 상태 초기화
-        this.state.draggedElement = null;
-        this.state.touchElement = null;
+        return false;
+    }
 
-        // 짧은 지연 후 isTouching 해제 (클릭 이벤트 방지)
-        setTimeout(() => {
-            this.state.isTouching = false;
-        }, 100);
+    // 위젯 선택 해제
+    clearWidgetSelection() {
+        if (this.state.selectedWidget) {
+            this.state.selectedWidget.classList.remove('selected');
+            this.state.selectedWidget = null;
+        }
+
+        document.querySelectorAll('.widget').forEach(w => {
+            w.classList.remove('target');
+        });
     }
 
     // ==================== 레이아웃 관리 ====================

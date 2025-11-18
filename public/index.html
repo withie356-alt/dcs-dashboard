@@ -288,6 +288,30 @@
             border: 2px dashed #007AFF;
         }
 
+        .widget.selected {
+            background: #E5E5EA;
+            border: 2px solid #86868B;
+            opacity: 0.7;
+        }
+
+        .widget.target {
+            background: rgba(52, 199, 89, 0.1);
+            border: 2px solid #34C759;
+            cursor: pointer;
+            animation: pulse-green 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-green {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.4);
+            }
+            50% {
+                transform: scale(1.02);
+                box-shadow: 0 0 0 8px rgba(52, 199, 89, 0);
+            }
+        }
+
         .widget-header {
             display: flex;
             justify-content: space-between;
