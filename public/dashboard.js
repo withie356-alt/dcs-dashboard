@@ -1084,13 +1084,19 @@ class Dashboard {
         const name = prompt('레이아웃 이름을 입력하세요:', `레이아웃 ${new Date().toLocaleDateString()}`);
         if (!name) return;
 
+        // DOM 순서를 기준으로 현재 순서 가져오기 (드래그 후 순서 보장)
+        const widgets = [...document.querySelectorAll('.widget')];
+        const currentOrder = widgets.map(w => w.getAttribute('data-tag'));
+
+        console.log('💾 저장할 순서:', currentOrder);
+
         try {
             const response = await fetch(`${this.apiBaseUrl}/saved-selections`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: name,
-                    tag_names: this.state.selectedTags
+                    tag_names: currentOrder  // DOM 순서 사용
                 })
             });
 
