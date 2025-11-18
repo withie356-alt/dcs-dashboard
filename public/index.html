@@ -7,6 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>DCS 실시간 모니터링</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
@@ -197,6 +198,19 @@
             transform: translateY(-2px);
         }
 
+        .widget.draggable {
+            cursor: move;
+        }
+
+        .widget.dragging {
+            opacity: 0.5;
+            transform: scale(1.05);
+        }
+
+        .widget.drag-over {
+            border: 2px dashed #007AFF;
+        }
+
         .widget-header {
             display: flex;
             justify-content: space-between;
@@ -227,10 +241,14 @@
             cursor: pointer;
             font-size: 16px;
             color: #FF3B30;
-            display: flex;
             align-items: center;
             justify-content: center;
             transition: all 0.2s;
+            display: none;
+        }
+
+        .edit-mode .widget-close {
+            display: flex;
         }
 
         .widget-close:hover {
@@ -563,16 +581,10 @@
     <div class="login-screen" id="loginScreen">
         <div class="login-box">
             <h2>DCS 모니터링 로그인</h2>
-            <input type="text" id="loginUsername" placeholder="아이디" class="login-input"
-                   onkeypress="if(event.key==='Enter') dashboard.login()">
-            <input type="password" id="loginPassword" placeholder="비밀번호" class="login-input"
-                   onkeypress="if(event.key==='Enter') dashboard.login()">
-            <label style="display: flex; align-items: center; gap: 8px; margin: 12px 0; font-size: 13px; color: white; cursor: pointer;">
-                <input type="checkbox" id="rememberMe" style="width: auto; margin: 0;">
-                로그인 상태 유지
-            </label>
+            <input type="text" id="loginUsername" value="admin" class="login-input" placeholder="아이디">
+            <input type="password" id="loginPassword" value="admin" class="login-input" placeholder="비밀번호">
             <button class="btn btn-primary" style="width: 100%;" onclick="dashboard.login()">로그인</button>
-            <div id="loginError"></div>
+            <div id="loginError" style="color: red; margin-top: 10px; display: none;"></div>
         </div>
     </div>
 
@@ -589,6 +601,7 @@
             </div>
 
             <div class="controls-row">
+                <button class="btn btn-primary" onclick="dashboard.openLayoutManager()" style="padding: 10px 14px;">☰</button>
                 <button class="btn btn-primary" onclick="dashboard.openTagSelector()">⚙ 계기 선택</button>
                 <button class="btn btn-primary" onclick="dashboard.refreshData()" id="refreshBtn">🔄 새로고침</button>
                 <div class="time-display" id="timeDisplay">
@@ -631,6 +644,27 @@
                 <button class="btn btn-primary" onclick="dashboard.selectAllTags()">전체 선택</button>
                 <button class="btn btn-primary" onclick="dashboard.clearAllTags()">전체 해제</button>
                 <button class="btn btn-primary" style="margin-left: auto;" onclick="dashboard.applySelectedTags()">적용</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 레이아웃 관리 모달 -->
+    <div class="modal" id="layoutManagerModal" onclick="if(event.target===this) dashboard.closeModal('layoutManagerModal')">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 class="modal-title">레이아웃 관리</h2>
+                <button class="close-btn" onclick="dashboard.closeModal('layoutManagerModal')">×</button>
+            </div>
+
+            <div class="modal-body">
+                <div id="layoutList" style="max-height: 300px; overflow-y: auto; margin-bottom: 16px;">
+                    <!-- 레이아웃 목록이 여기에 표시됩니다 -->
+                </div>
+
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-primary" style="flex: 1;" onclick="dashboard.saveCurrentLayout()">💾 현재 레이아웃 저장</button>
+                    <button class="btn btn-primary" id="editModeBtn" onclick="dashboard.toggleEditMode()">✏️ 수정 모드</button>
+                </div>
             </div>
         </div>
     </div>

@@ -1,8 +1,6 @@
 class Dashboard {
     constructor() {
         // 환경에 따라 API URL 자동 설정
-        // localhost에서 실행 시 -> http://localhost:3001/api
-        // Vercel 배포 시 -> 같은 origin의 /api
         const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         this.apiBaseUrl = isLocalhost ? 'http://localhost:3001/api' : '/api';
 
@@ -11,35 +9,10 @@ class Dashboard {
             dateTo: new Date(),
             selectedTags: [],
             availableTagsData: [],
-            chartData: new Map()
+            chartData: new Map(),
+            editMode: false,
+            draggedElement: null
         };
-
-        // 저장된 로그인 확인 및 자동 로그인
-        this.checkSavedLogin();
-    }
-
-    // 저장된 로그인 상태 확인
-    checkSavedLogin() {
-        const savedUser = localStorage.getItem('savedUser');
-        if (savedUser) {
-            try {
-                const user = JSON.parse(savedUser);
-                console.log('✅ 저장된 로그인 정보 발견:', user.username);
-
-                // 사용자 정보 복원
-                localStorage.setItem('user', savedUser);
-
-                // 로그인 화면 숨기고 대시보드 표시
-                document.getElementById('loginScreen').style.display = 'none';
-                document.getElementById('mainContainer').style.display = 'block';
-
-                // 대시보드 초기화
-                this.init();
-            } catch (error) {
-                console.error('저장된 로그인 정보 로드 실패:', error);
-                localStorage.removeItem('savedUser');
-            }
-        }
     }
 
     async init() {
@@ -47,58 +20,30 @@ class Dashboard {
         document.getElementById('dateFrom').value = this.formatDate(this.state.dateFrom);
         document.getElementById('dateTo').value = this.formatDate(this.state.dateTo);
 
-        // 메타데이터는 계기 선택 버튼을 눌렀을 때 로드
+        console.log('✅ DCS 대시보드 준비 완료');
     }
 
-    // 로그인
+    // 로그인 (Supabase 사용)
     async login() {
         const username = document.getElementById('loginUsername').value;
         const password = document.getElementById('loginPassword').value;
         const errorEl = document.getElementById('loginError');
-        const loginBtn = document.querySelector('#loginScreen button');
 
-        if (!username || !password) {
-            errorEl.textContent = '아이디와 비밀번호를 입력해주세요.';
-            errorEl.style.display = 'block';
-            return;
-        }
+        errorEl.style.display = 'none';
 
         try {
-            // 로딩 상태 표시
-            if (loginBtn) {
-                loginBtn.disabled = true;
-                loginBtn.textContent = '로그인 중...';
-            }
-            errorEl.style.display = 'none';
+            console.log('🔐 로그인 시도:', username);
 
-            // 로그인 API 호출
             const response = await fetch(`${this.apiBaseUrl}/login`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
 
             const result = await response.json();
 
             if (result.success) {
-                // 로그인 성공
-                console.log('✅ 로그인 성공:', result.user.username);
-
-                // 사용자 정보 저장
-                localStorage.setItem('user', JSON.stringify(result.user));
-
-                // 로그인 상태 유지 체크 확인
-                const rememberMe = document.getElementById('rememberMe').checked;
-                if (rememberMe) {
-                    // 로그인 정보를 영구 저장
-                    localStorage.setItem('savedUser', JSON.stringify(result.user));
-                    console.log('💾 로그인 상태 저장됨');
-                } else {
-                    // 저장된 로그인 정보 제거
-                    localStorage.removeItem('savedUser');
-                }
+                console.log('✅ 로그인 성공!');
 
                 // 화면 전환
                 document.getElementById('loginScreen').style.display = 'none';
@@ -107,20 +52,14 @@ class Dashboard {
                 // 대시보드 초기화
                 this.init();
             } else {
-                // 로그인 실패
-                errorEl.textContent = result.message || '로그인에 실패했습니다.';
+                console.error('❌ 로그인 실패:', result.message);
+                errorEl.textContent = result.message;
                 errorEl.style.display = 'block';
             }
         } catch (error) {
-            console.error('로그인 오류:', error);
-            errorEl.textContent = '로그인 처리 중 오류가 발생했습니다.';
+            console.error('❌ 로그인 에러:', error);
+            errorEl.textContent = '로그인 실패: ' + error.message;
             errorEl.style.display = 'block';
-        } finally {
-            // 로딩 상태 해제
-            if (loginBtn) {
-                loginBtn.disabled = false;
-                loginBtn.textContent = '로그인';
-            }
         }
     }
 
@@ -148,12 +87,13 @@ class Dashboard {
                         month: '2-digit',
                         day: '2-digit',
                         hour: '2-digit',
-                        minute: '2-digit'
+                        minute: '2-digit',
+                        hour12: false
                     });
-                    lastUpdatedEl.textContent = `마지막 업데이트: ${formatted} ${source === 'Supabase 캐시' ? '(캐시)' : '(신규)'}`;
+                    lastUpdatedEl.textContent = `${formatted} 목록`;
                     console.log('📅 마지막 업데이트:', formatted);
                 } else if (lastUpdatedEl && !result.cached) {
-                    lastUpdatedEl.textContent = `방금 API에서 가져옴`;
+                    lastUpdatedEl.textContent = `방금 가져온 목록`;
                 }
             }
         } catch (error) {
@@ -328,15 +268,40 @@ class Dashboard {
         const grid = document.getElementById('dashboardGrid');
         grid.innerHTML = '';
 
-        this.state.selectedTags.forEach(tagName => {
+        this.state.selectedTags.forEach((tagName, index) => {
             const widget = document.createElement('div');
             widget.className = 'widget';
             widget.id = `widget-${tagName}`;
-            widget.onclick = () => this.openChartModal(tagName);
+            widget.setAttribute('data-tag', tagName);
+            widget.setAttribute('data-index', index);
+            widget.draggable = true;
 
-            // 메타데이터에서 태그 정보 찾기
-            const tagData = this.state.availableTagsData.find(t => t.tag_name === tagName);
+            // 드래그 이벤트
+            widget.addEventListener('dragstart', (e) => this.handleDragStart(e));
+            widget.addEventListener('dragend', (e) => this.handleDragEnd(e));
+            widget.addEventListener('dragover', (e) => this.handleDragOver(e));
+            widget.addEventListener('drop', (e) => this.handleDrop(e));
+            widget.addEventListener('dragleave', (e) => this.handleDragLeave(e));
+
+            // 클릭 이벤트 (드래그 중이 아닐 때만)
+            widget.addEventListener('click', (e) => {
+                if (!this.state.draggedElement) {
+                    this.openChartModal(tagName);
+                }
+            });
+
+            // 메타데이터에서 태그 정보 찾기 (대소문자 구분 없이)
+            const tagData = this.state.availableTagsData.find(t =>
+                t.tag_name && t.tag_name.toLowerCase() === tagName.toLowerCase()
+            );
             const desc = tagData?.tag_desc || tagData?.description || this.getTagDescription(tagName);
+
+            // 디버깅: 메타데이터 매칭 확인
+            if (tagData) {
+                console.log(`📋 ${tagName} 설명:`, desc);
+            } else {
+                console.warn(`⚠️ ${tagName}의 메타데이터를 찾을 수 없습니다. 기본 설명 사용:`, desc);
+            }
 
             widget.innerHTML = `
                 <div class="widget-header">
@@ -560,10 +525,12 @@ class Dashboard {
 
         if (!modal || !canvas) return;
 
-        // 메타데이터에서 설명 가져오기
-        const tagData = this.state.availableTagsData.find(t => t.tag_name === tagName);
+        // 메타데이터에서 설명 가져오기 (대소문자 구분 없이)
+        const tagData = this.state.availableTagsData.find(t =>
+            t.tag_name && t.tag_name.toLowerCase() === tagName.toLowerCase()
+        );
         const desc = tagData?.tag_desc || tagData?.description || this.getTagDescription(tagName);
-        title.textContent = `${tagName} (${desc})`;
+        title.innerHTML = `${tagName}<br><span style="font-size: 14px; font-weight: 400; color: #86868B;">(${desc})</span>`;
 
         const chartData = this.state.chartData.get(tagName);
         if (!chartData || chartData.length === 0) {
@@ -596,11 +563,11 @@ class Dashboard {
             data: {
                 labels: chartData.map(item =>
                     new Date(item.dtm || item.timestamp || item.exec_tm).toLocaleString('ko-KR', {
-                        month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                        month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false
                     })
                 ),
                 datasets: [{
-                    label: `${tagName} ${this.getUnit(tagName)}`,
+                    label: `${this.getUnit(tagName)}`,
                     data: values,
                     borderColor: '#007AFF',
                     backgroundColor: 'rgba(0, 122, 255, 0.1)',
@@ -613,7 +580,7 @@ class Dashboard {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: true },
+                    legend: { display: false },
                     tooltip: { enabled: true }
                 },
                 scales: {
@@ -662,6 +629,260 @@ class Dashboard {
         setTimeout(() => {
             notification.classList.remove('show');
         }, 3000);
+    }
+
+    // ==================== 드래그 앤 드롭 ====================
+
+    handleDragStart(e) {
+        this.state.draggedElement = e.currentTarget;
+        e.currentTarget.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+    }
+
+    handleDragEnd(e) {
+        e.currentTarget.classList.remove('dragging');
+        document.querySelectorAll('.widget').forEach(w => w.classList.remove('drag-over'));
+        this.state.draggedElement = null;
+    }
+
+    handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+
+        const afterElement = this.getDragAfterElement(e.currentTarget.parentElement, e.clientY);
+        if (afterElement == null) {
+            e.currentTarget.parentElement.appendChild(this.state.draggedElement);
+        } else {
+            e.currentTarget.parentElement.insertBefore(this.state.draggedElement, afterElement);
+        }
+    }
+
+    handleDrop(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const draggedTag = this.state.draggedElement.getAttribute('data-tag');
+        const targetTag = e.currentTarget.getAttribute('data-tag');
+
+        if (draggedTag === targetTag) return;
+
+        // selectedTags 배열 순서 변경
+        const draggedIndex = this.state.selectedTags.indexOf(draggedTag);
+        const targetIndex = this.state.selectedTags.indexOf(targetTag);
+
+        this.state.selectedTags.splice(draggedIndex, 1);
+        this.state.selectedTags.splice(targetIndex, 0, draggedTag);
+
+        // 위젯 재렌더링
+        this.renderWidgets();
+
+        // 캐시된 데이터로 현재 값 복원
+        for (const [tagName, items] of this.state.chartData.entries()) {
+            if (items && items.length > 0) {
+                const lastValue = items[items.length - 1].tag_val;
+                const valueEl = document.getElementById(`value-${tagName}`);
+                if (valueEl) {
+                    valueEl.textContent = Number(lastValue).toFixed(2);
+                }
+
+                const unitEl = document.getElementById(`unit-${tagName}`);
+                if (unitEl) {
+                    unitEl.textContent = this.getUnit(tagName);
+                }
+            }
+        }
+    }
+
+    handleDragLeave(e) {
+        e.currentTarget.classList.remove('drag-over');
+    }
+
+    getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.widget:not(.dragging)')];
+
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    // ==================== 레이아웃 관리 ====================
+
+    // 수정 모드 토글
+    toggleEditMode() {
+        this.state.editMode = !this.state.editMode;
+        const grid = document.getElementById('dashboardGrid');
+        const btn = document.getElementById('editModeBtn');
+
+        if (this.state.editMode) {
+            grid.classList.add('edit-mode');
+            btn.textContent = '✅ 저장';
+            btn.style.background = '#34C759';
+            this.showNotification('수정 모드 활성화', 'success');
+        } else {
+            grid.classList.remove('edit-mode');
+            btn.textContent = '✏️ 수정 모드';
+            btn.style.background = '';
+            this.showNotification('수정 모드 종료', 'success');
+        }
+    }
+
+    // 레이아웃 관리 모달 열기
+    async openLayoutManager() {
+        document.getElementById('layoutManagerModal').classList.add('active');
+        await this.loadSavedLayouts();
+    }
+
+    // 저장된 레이아웃 목록 불러오기
+    async loadSavedLayouts() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/saved-selections`);
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                // 레이아웃 리스트 업데이트
+                const layoutList = document.getElementById('layoutList');
+                layoutList.innerHTML = '';
+
+                result.data.forEach(item => {
+                    // 레이아웃 리스트 아이템 추가
+                    const listItem = document.createElement('div');
+                    listItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #F5F5F7; border-radius: 8px; margin-bottom: 8px;';
+
+                    const nameDiv = document.createElement('div');
+                    nameDiv.style.cssText = 'flex: 1;';
+                    nameDiv.innerHTML = `
+                        <div style="font-weight: 600; color: #1D1D1F; margin-bottom: 2px;">${item.name}</div>
+                        <div style="font-size: 12px; color: #86868B;">${item.tag_names.length}개 계기</div>
+                    `;
+
+                    const btnGroup = document.createElement('div');
+                    btnGroup.style.cssText = 'display: flex; gap: 8px;';
+
+                    const loadBtn = document.createElement('button');
+                    loadBtn.className = 'btn btn-primary';
+                    loadBtn.textContent = '불러오기';
+                    loadBtn.style.cssText = 'height: 36px; padding: 0 12px; font-size: 13px;';
+                    loadBtn.onclick = async () => {
+                        this.state.selectedTags = item.tag_names;
+                        this.renderWidgets();
+                        this.refreshData();
+                        this.closeModal('layoutManagerModal');
+                        this.showNotification(`"${item.name}" 레이아웃 적용 완료!`, 'success');
+                    };
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'btn';
+                    deleteBtn.textContent = '삭제';
+                    deleteBtn.style.cssText = 'height: 36px; padding: 0 12px; font-size: 13px; background: #F5F5F7; color: #86868B; border: 1px solid #D1D1D6;';
+                    deleteBtn.onclick = () => this.deleteLayout(item.id, item.name);
+
+                    btnGroup.appendChild(loadBtn);
+                    btnGroup.appendChild(deleteBtn);
+                    listItem.appendChild(nameDiv);
+                    listItem.appendChild(btnGroup);
+                    layoutList.appendChild(listItem);
+                });
+
+                console.log(`✅ 저장된 레이아웃 ${result.data.length}개 로드`);
+            }
+        } catch (error) {
+            console.error('레이아웃 로드 실패:', error);
+        }
+    }
+
+    // 현재 레이아웃 저장
+    async saveCurrentLayout() {
+        if (this.state.selectedTags.length === 0) {
+            this.showNotification('저장할 계기가 없습니다.', 'error');
+            return;
+        }
+
+        const name = prompt('레이아웃 이름을 입력하세요:', `레이아웃 ${new Date().toLocaleDateString()}`);
+        if (!name) return;
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/saved-selections`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: name,
+                    tag_names: this.state.selectedTags
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('레이아웃이 저장되었습니다!', 'success');
+                await this.loadSavedLayouts();
+            } else {
+                this.showNotification('저장 실패: ' + result.message, 'error');
+            }
+        } catch (error) {
+            console.error('레이아웃 저장 실패:', error);
+            this.showNotification('저장 중 오류 발생', 'error');
+        }
+    }
+
+    // 레이아웃 불러오기
+    async loadLayout() {
+        const select = document.getElementById('savedLayoutsList');
+        const id = select.value;
+
+        if (!id) {
+            this.showNotification('불러올 레이아웃을 선택해주세요.', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/saved-selections/${id}`);
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                this.state.selectedTags = result.data.tag_names;
+                this.renderWidgets();
+                this.refreshData();
+                this.closeModal('layoutManagerModal');
+                this.showNotification(`"${result.data.name}" 레이아웃 적용 완료!`, 'success');
+            } else {
+                this.showNotification('불러오기 실패', 'error');
+            }
+        } catch (error) {
+            console.error('레이아웃 불러오기 실패:', error);
+            this.showNotification('불러오기 중 오류 발생', 'error');
+        }
+    }
+
+    // 레이아웃 삭제
+    async deleteLayout(id, name) {
+        if (!confirm(`"${name}" 레이아웃을 삭제하시겠습니까?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/saved-selections/${id}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification(`"${name}" 레이아웃이 삭제되었습니다.`, 'success');
+                await this.loadSavedLayouts();
+            } else {
+                this.showNotification('삭제 실패: ' + result.message, 'error');
+            }
+        } catch (error) {
+            console.error('레이아웃 삭제 실패:', error);
+            this.showNotification('삭제 중 오류 발생', 'error');
+        }
     }
 }
 

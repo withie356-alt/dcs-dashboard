@@ -85,7 +85,10 @@ app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
 
+        console.log(`🔐 로그인 시도: ${username}`);
+
         if (!username || !password) {
+            console.log('❌ 로그인 실패: 아이디/비밀번호 미입력');
             return res.status(400).json({
                 success: false,
                 message: '아이디와 비밀번호를 입력해주세요.'
@@ -93,9 +96,16 @@ app.post('/api/login', async (req, res) => {
         }
 
         if (!supabase) {
+            console.error('❌ Supabase 클라이언트가 초기화되지 않음');
+            console.error('   - SUPABASE_URL:', process.env.SUPABASE_URL ? '설정됨' : '❌ 미설정');
+            console.error('   - SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? '설정됨' : '❌ 미설정');
             return res.status(500).json({
                 success: false,
-                message: 'Supabase가 설정되지 않았습니다.'
+                message: 'Supabase가 설정되지 않았습니다.',
+                debug: process.env.NODE_ENV === 'development' ? {
+                    supabase_url_exists: !!process.env.SUPABASE_URL,
+                    supabase_key_exists: !!process.env.SUPABASE_ANON_KEY
+                } : undefined
             });
         }
 
@@ -106,19 +116,33 @@ app.post('/api/login', async (req, res) => {
             .eq('username', username)
             .single();
 
+        if (error) {
+            console.error('❌ Supabase 쿼리 에러:', error.message);
+            console.error('   - 에러 코드:', error.code);
+            console.error('   - 에러 상세:', error.details);
+            if (error.code === 'PGRST116') {
+                console.error('   → users 테이블에 해당 사용자가 없습니다.');
+                console.error('   → SUPABASE_SETUP.sql을 실행했는지 확인하세요.');
+            }
+        }
+
         if (error || !user) {
-            console.log('❌ 로그인 실패: 사용자를 찾을 수 없음');
+            console.log(`❌ 로그인 실패: 사용자를 찾을 수 없음 (${username})`);
             return res.status(401).json({
                 success: false,
                 message: '아이디 또는 비밀번호가 올바르지 않습니다.'
             });
         }
 
+        console.log(`✅ 사용자 발견: ${username} (ID: ${user.id})`);
+
         // 비밀번호 확인
         const passwordMatch = await bcrypt.compare(password, user.password_hash);
 
         if (!passwordMatch) {
             console.log('❌ 로그인 실패: 비밀번호 불일치');
+            console.log('   - 입력한 비밀번호:', password);
+            console.log('   - 저장된 해시:', user.password_hash.substring(0, 20) + '...');
             return res.status(401).json({
                 success: false,
                 message: '아이디 또는 비밀번호가 올바르지 않습니다.'
@@ -142,7 +166,8 @@ app.post('/api/login', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Login error:', error.message);
+        console.error('❌ Login error:', error.message);
+        console.error('   스택 트레이스:', error.stack);
         res.status(500).json({
             success: false,
             message: '로그인 처리 중 오류가 발생했습니다.',
@@ -293,6 +318,116 @@ app.post('/api/data', async (req, res) => {
             message: 'Failed to fetch data',
             error: error.message
         });
+    }
+});
+
+// ==================== 계기 선택 저장/불러오기 API ====================
+
+// 저장된 선택 목록 조회
+app.get('/api/saved-selections', async (req, res) => {
+    try {
+        if (!supabase) {
+            return res.status(500).json({ success: false, message: 'Supabase 미설정' });
+        }
+
+        const { data, error } = await supabase
+            .from('saved_tag_selections')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        res.json({ success: true, data: data });
+    } catch (error) {
+        console.error('저장된 선택 조회 실패:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// 특정 선택 조회
+app.get('/api/saved-selections/:id', async (req, res) => {
+    try {
+        if (!supabase) {
+            return res.status(500).json({ success: false, message: 'Supabase 미설정' });
+        }
+
+        const { data, error } = await supabase
+            .from('saved_tag_selections')
+            .select('*')
+            .eq('id', req.params.id)
+            .single();
+
+        if (error) throw error;
+
+        res.json({ success: true, data: data });
+    } catch (error) {
+        console.error('선택 조회 실패:', error);
+        res.status(404).json({ success: false, message: error.message });
+    }
+});
+
+// 새 선택 저장
+app.post('/api/saved-selections', async (req, res) => {
+    try {
+        const { name, tag_names } = req.body;
+
+        if (!name || !tag_names || !Array.isArray(tag_names)) {
+            return res.status(400).json({
+                success: false,
+                message: 'name과 tag_names(배열) 필요'
+            });
+        }
+
+        if (!supabase) {
+            return res.status(500).json({ success: false, message: 'Supabase 미설정' });
+        }
+
+        const { data, error } = await supabase
+            .from('saved_tag_selections')
+            .insert([{
+                name: name,
+                tag_names: tag_names,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            }])
+            .select();
+
+        if (error) throw error;
+
+        console.log(`✅ 선택 저장: ${name} (${tag_names.length}개)`);
+
+        res.json({ success: true, data: data[0] });
+    } catch (error) {
+        console.error('선택 저장 실패:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// 선택 삭제
+app.delete('/api/saved-selections/:id', async (req, res) => {
+    try {
+        if (!supabase) {
+            return res.status(500).json({ success: false, message: 'Supabase 미설정' });
+        }
+
+        const { data, error } = await supabase
+            .from('saved_tag_selections')
+            .delete()
+            .eq('id', req.params.id)
+            .select();
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            return res.status(404).json({ success: false, message: '레이아웃을 찾을 수 없습니다' });
+        }
+
+        console.log(`🗑️ 레이아웃 삭제: ${data[0].name}`);
+
+        res.json({ success: true, message: '레이아웃이 삭제되었습니다' });
+    } catch (error) {
+        console.error('레이아웃 삭제 실패:', error);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
