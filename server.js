@@ -431,6 +431,178 @@ app.delete('/api/saved-selections/:id', async (req, res) => {
     }
 });
 
+// ========================================
+// 단위 관리 API
+// ========================================
+
+// 단위 목록 조회
+app.get('/api/units', async (req, res) => {
+    try {
+        if (!supabase) {
+            return res.status(500).json({ success: false, message: 'Supabase 미설정' });
+        }
+
+        const { data, error } = await supabase
+            .from('units')
+            .select('*')
+            .order('unit_name', { ascending: true });
+
+        if (error) throw error;
+
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('단위 목록 조회 실패:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// 단위 추가
+app.post('/api/units', async (req, res) => {
+    try {
+        if (!supabase) {
+            return res.status(500).json({ success: false, message: 'Supabase 미설정' });
+        }
+
+        const { unit_name } = req.body;
+
+        if (!unit_name) {
+            return res.status(400).json({ success: false, message: '단위를 입력하세요' });
+        }
+
+        const { data, error } = await supabase
+            .from('units')
+            .insert({ unit_name })
+            .select();
+
+        if (error) throw error;
+
+        console.log(`✅ 단위 추가: ${unit_name}`);
+        res.json({ success: true, data: data[0] });
+    } catch (error) {
+        console.error('단위 추가 실패:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// 단위 삭제
+app.delete('/api/units/:unit_name', async (req, res) => {
+    try {
+        if (!supabase) {
+            return res.status(500).json({ success: false, message: 'Supabase 미설정' });
+        }
+
+        const { unit_name } = req.params;
+
+        const { data, error } = await supabase
+            .from('units')
+            .delete()
+            .eq('unit_name', unit_name)
+            .select();
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            return res.status(404).json({ success: false, message: '단위를 찾을 수 없습니다' });
+        }
+
+        console.log(`🗑️ 단위 삭제: ${unit_name}`);
+        res.json({ success: true, message: '단위가 삭제되었습니다' });
+    } catch (error) {
+        console.error('단위 삭제 실패:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ========================================
+// 태그 설정 API
+// ========================================
+
+// 태그 설정 목록 조회
+app.get('/api/tag-settings', async (req, res) => {
+    try {
+        if (!supabase) {
+            return res.status(500).json({ success: false, message: 'Supabase 미설정' });
+        }
+
+        const { data, error } = await supabase
+            .from('tag_settings')
+            .select('*')
+            .order('tag_name', { ascending: true });
+
+        if (error) throw error;
+
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('태그 설정 조회 실패:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// 태그 설정 저장/수정
+app.post('/api/tag-settings', async (req, res) => {
+    try {
+        if (!supabase) {
+            return res.status(500).json({ success: false, message: 'Supabase 미설정' });
+        }
+
+        const { tag_name, custom_name, multiplier, unit } = req.body;
+
+        if (!tag_name) {
+            return res.status(400).json({ success: false, message: '태그를 입력하세요' });
+        }
+
+        const { data, error } = await supabase
+            .from('tag_settings')
+            .upsert({
+                tag_name,
+                custom_name: custom_name || null,
+                multiplier: multiplier || 1.0,
+                unit: unit || null,
+                updated_at: new Date().toISOString()
+            }, {
+                onConflict: 'tag_name'
+            })
+            .select();
+
+        if (error) throw error;
+
+        console.log(`✅ 태그 설정 저장: ${tag_name}`);
+        res.json({ success: true, data: data[0] });
+    } catch (error) {
+        console.error('태그 설정 저장 실패:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// 태그 설정 삭제 (초기화)
+app.delete('/api/tag-settings/:tag_name', async (req, res) => {
+    try {
+        if (!supabase) {
+            return res.status(500).json({ success: false, message: 'Supabase 미설정' });
+        }
+
+        const { tag_name } = req.params;
+
+        const { data, error } = await supabase
+            .from('tag_settings')
+            .delete()
+            .eq('tag_name', tag_name)
+            .select();
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            return res.status(404).json({ success: false, message: '태그 설정을 찾을 수 없습니다' });
+        }
+
+        console.log(`🗑️ 태그 설정 삭제: ${tag_name}`);
+        res.json({ success: true, message: '태그 설정이 초기화되었습니다' });
+    } catch (error) {
+        console.error('태그 설정 삭제 실패:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 // 헬스 체크
 app.get('/health', (req, res) => {
     res.json({

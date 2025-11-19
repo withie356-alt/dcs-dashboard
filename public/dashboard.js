@@ -18,7 +18,9 @@ class Dashboard {
             touchTimer: null,
             isTouching: false,
             touchElement: null,
-            selectedWidget: null  // 모바일에서 선택된 위젯
+            selectedWidget: null,  // 모바일에서 선택된 위젯
+            tagSettings: new Map(),  // 태그별 커스텀 설정 (이름, 가중치, 단위)
+            availableUnits: []  // 사용 가능한 단위 목록
         };
 
         // 자동 로그인 체크
@@ -93,6 +95,12 @@ class Dashboard {
 
         // 메타데이터 미리 로드
         await this.loadMetadata(false);
+
+        // 태그 설정 및 단위 로드
+        await Promise.all([
+            this.loadTagSettings(),
+            this.loadUnits()
+        ]);
 
         // 위젯 렌더링 (선택된 태그가 없으면 안내 메시지 표시)
         this.renderWidgets();
@@ -420,6 +428,9 @@ class Dashboard {
             );
             const desc = tagData?.tag_desc || tagData?.description || this.getTagDescription(tagName);
 
+            // 커스텀 설정 적용
+            const displayName = this.getDisplayName(tagName, desc);
+
             // 디버깅: 메타데이터 매칭 확인
             if (tagData) {
                 console.log(`📋 ${tagName} 설명:`, desc);
@@ -429,13 +440,12 @@ class Dashboard {
 
             widget.innerHTML = `
                 <div class="widget-header">
-                    <div class="widget-title">${desc}</div>
+                    <div class="widget-title">${displayName}</div>
                     <button class="widget-close" onclick="event.stopPropagation(); dashboard.removeWidget('${tagName}')">×</button>
                 </div>
                 <div class="widget-desc">${tagName}</div>
                 <div class="widget-value">
                     <span id="value-${tagName}">--</span>
-                    <span class="widget-unit" id="unit-${tagName}"></span>
                 </div>
             `;
 
@@ -487,11 +497,9 @@ class Dashboard {
         document.getElementById('dateTo').value = this.formatDate(this.state.dateTo);
         console.log('🔄 dateTo 업데이트:', this.formatDate(this.state.dateTo));
 
-        const refreshBtn = document.getElementById('refreshBtn');
+        const refreshBtns = document.querySelectorAll('.refresh-btn');
         const loadingOverlay = document.getElementById('loadingOverlay');
-        if (refreshBtn) {
-            refreshBtn.classList.add('loading');
-        }
+        refreshBtns.forEach(btn => btn.classList.add('loading'));
         if (loadingOverlay) {
             loadingOverlay.classList.add('show');
         }
@@ -607,19 +615,20 @@ class Dashboard {
             const values = items.map(item => item.tag_val);
             console.log(`📈 ${tagName} 데이터:`, values);
 
-            // 최신 값 표시
+            // 최신 값 표시 (가중치 및 단위 적용)
             if (values.length > 0) {
                 const lastValue = values[values.length - 1];
                 const valueEl = document.getElementById(`value-${tagName}`);
                 if (valueEl) {
-                    valueEl.textContent = Number(lastValue).toFixed(2);
-                    console.log(`✅ ${tagName} 값 표시:`, lastValue);
+                    const adjustedValue = this.applyMultiplier(lastValue, tagName);
+                    valueEl.textContent = this.formatDisplayValue(adjustedValue, tagName);
+                    console.log(`✅ ${tagName} 값 표시:`, adjustedValue);
                 }
 
-                // 단위 표시
+                // 단위 표시 (제거 - formatDisplayValue에 포함됨)
                 const unitEl = document.getElementById(`unit-${tagName}`);
                 if (unitEl) {
-                    unitEl.textContent = this.getUnit(tagName);
+                    unitEl.textContent = '';
                 }
             } else {
                 console.warn(`⚠️ ${tagName}에 값이 없습니다`);
@@ -680,12 +689,22 @@ class Dashboard {
 
         if (!modal || !canvas) return;
 
+        // 설정 버튼에 이벤트 연결
+        const settingsBtn = document.getElementById('chartSettingsBtn');
+        if (settingsBtn) {
+            settingsBtn.onclick = (e) => {
+                e.stopPropagation();
+                this.openWidgetSettings(tagName);
+            };
+        }
+
         // 메타데이터에서 설명 가져오기 (대소문자 구분 없이)
         const tagData = this.state.availableTagsData.find(t =>
             t.tag_name && t.tag_name.toLowerCase() === tagName.toLowerCase()
         );
         const desc = tagData?.tag_desc || tagData?.description || this.getTagDescription(tagName);
-        title.innerHTML = `${desc}<br><span style="font-size: 14px; font-weight: 400; color: #86868B;">(${tagName})</span>`;
+        const displayName = this.getDisplayName(tagName, desc);
+        title.innerHTML = `${displayName}<br><span style="font-size: 14px; font-weight: 400; color: #86868B;">(${tagName})</span>`;
 
         const chartData = this.state.chartData.get(tagName);
         if (!chartData || chartData.length === 0) {
@@ -695,16 +714,16 @@ class Dashboard {
 
         modal.classList.add('active');
 
-        // 통계 계산
-        const values = chartData.map(item => item.tag_val);
+        // 통계 계산 (가중치 적용)
+        const values = chartData.map(item => this.applyMultiplier(item.tag_val, tagName));
         const min = Math.min(...values);
         const max = Math.max(...values);
         const avg = values.reduce((a, b) => a + b, 0) / values.length;
 
-        // 통계 표시
-        document.getElementById('statMin').textContent = min.toFixed(2);
-        document.getElementById('statAvg').textContent = avg.toFixed(2);
-        document.getElementById('statMax').textContent = max.toFixed(2);
+        // 통계 표시 (단위 포함)
+        document.getElementById('statMin').textContent = this.formatDisplayValue(min, tagName);
+        document.getElementById('statAvg').textContent = this.formatDisplayValue(avg, tagName);
+        document.getElementById('statMax').textContent = this.formatDisplayValue(max, tagName);
 
         // 기존 차트가 있다면 삭제
         if (this.modalChart) {
@@ -722,7 +741,7 @@ class Dashboard {
                     })
                 ),
                 datasets: [{
-                    label: `${this.getUnit(tagName)}`,
+                    label: this.getTagSetting(tagName).unit || '값',
                     data: values,
                     borderColor: '#007AFF',
                     backgroundColor: 'rgba(0, 122, 255, 0.1)',
@@ -763,6 +782,11 @@ class Dashboard {
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
+    }
+
+    // 모달 열기
+    openModal(modalId) {
+        document.getElementById(modalId).classList.add('active');
     }
 
     // 모달 닫기
@@ -830,13 +854,14 @@ class Dashboard {
         // 위젯 재렌더링
         this.renderWidgets();
 
-        // 캐시된 데이터로 현재 값 복원
+        // 캐시된 데이터로 현재 값 복원 (가중치 및 단위 적용)
         for (const [tagName, items] of this.state.chartData.entries()) {
             if (items && items.length > 0) {
                 const lastValue = items[items.length - 1].tag_val;
                 const valueEl = document.getElementById(`value-${tagName}`);
                 if (valueEl) {
-                    valueEl.textContent = Number(lastValue).toFixed(2);
+                    const adjustedValue = this.applyMultiplier(lastValue, tagName);
+                    valueEl.textContent = this.formatDisplayValue(adjustedValue, tagName);
                 }
 
                 const unitEl = document.getElementById(`unit-${tagName}`);
@@ -963,13 +988,14 @@ class Dashboard {
         // 위젯 재렌더링
         this.renderWidgets();
 
-        // 캐시된 데이터로 현재 값 복원
+        // 캐시된 데이터로 현재 값 복원 (가중치 및 단위 적용)
         for (const [tagName, items] of this.state.chartData.entries()) {
             if (items && items.length > 0) {
                 const lastValue = items[items.length - 1].tag_val;
                 const valueEl = document.getElementById(`value-${tagName}`);
                 if (valueEl) {
-                    valueEl.textContent = Number(lastValue).toFixed(2);
+                    const adjustedValue = this.applyMultiplier(lastValue, tagName);
+                    valueEl.textContent = this.formatDisplayValue(adjustedValue, tagName);
                 }
 
                 const unitEl = document.getElementById(`unit-${tagName}`);
@@ -1178,6 +1204,505 @@ class Dashboard {
         } catch (error) {
             console.error('레이아웃 삭제 실패:', error);
             this.showNotification('삭제 중 오류 발생', 'error');
+        }
+    }
+
+    // 태그 설정 로드
+    async loadTagSettings() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/tag-settings`);
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                this.state.tagSettings.clear();
+                result.data.forEach(setting => {
+                    this.state.tagSettings.set(setting.tag_name, {
+                        customName: setting.custom_name,
+                        multiplier: parseFloat(setting.multiplier) || 1.0,
+                        unit: setting.unit || ''
+                    });
+                });
+                console.log('✅ 태그 설정 로드 완료:', this.state.tagSettings.size);
+            }
+        } catch (error) {
+            console.error('태그 설정 로드 실패:', error);
+            // 로드 실패해도 계속 진행
+        }
+    }
+
+    // 단위 목록 로드
+    async loadUnits() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/units`);
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                this.state.availableUnits = result.data.map(u => u.unit_name);
+                console.log('✅ 단위 목록 로드 완료:', this.state.availableUnits.length);
+            }
+        } catch (error) {
+            console.error('단위 목록 로드 실패:', error);
+            // 기본 단위 사용
+            this.state.availableUnits = ['°C', '°F', 'bar', 'psi', 'kPa', 'MPa', 'L/min', 'm³/h', 'kg/h', 'rpm', '%', 'kW', 'MW', 'A', 'V'];
+        }
+    }
+
+    // 태그 설정 가져오기
+    getTagSetting(tagName) {
+        return this.state.tagSettings.get(tagName) || {
+            customName: null,
+            multiplier: 1.0,
+            unit: ''
+        };
+    }
+
+    // 값에 가중치 적용
+    applyMultiplier(value, tagName) {
+        const setting = this.getTagSetting(tagName);
+        if (value === null || value === undefined || isNaN(value)) return value;
+        return value * setting.multiplier;
+    }
+
+    // 표시 이름 가져오기
+    getDisplayName(tagName, description) {
+        const setting = this.getTagSetting(tagName);
+        return setting.customName || description;
+    }
+
+    // 표시 값 포맷팅 (값 + 단위)
+    formatDisplayValue(value, tagName) {
+        const setting = this.getTagSetting(tagName);
+        if (value === null || value === undefined) return '--';
+
+        const formattedValue = typeof value === 'number' ? value.toFixed(2) : value;
+        const unit = setting.unit ? setting.unit : '';
+        return unit ? `${formattedValue} ${unit}` : formattedValue;
+    }
+
+    // 설정 관리 모달 열기
+    openSettingsManager() {
+        this.loadUnitsToManager();
+        this.loadTagSettingsToManager();
+        this.switchSettingsTab('tags'); // 기본 탭: 태그 설정
+        this.openModal('settingsManagerModal');
+    }
+
+    // 설정 탭 전환
+    switchSettingsTab(tab) {
+        const unitsTab = document.getElementById('unitsTab');
+        const tagsTab = document.getElementById('tagsTab');
+        const unitsContent = document.getElementById('unitsTabContent');
+        const tagsContent = document.getElementById('tagsTabContent');
+
+        if (tab === 'units') {
+            unitsTab.style.background = '#007AFF';
+            unitsTab.style.color = 'white';
+            tagsTab.style.background = 'white';
+            tagsTab.style.color = '#1D1D1F';
+            unitsContent.style.display = 'block';
+            tagsContent.style.display = 'none';
+        } else {
+            unitsTab.style.background = 'white';
+            unitsTab.style.color = '#1D1D1F';
+            tagsTab.style.background = '#007AFF';
+            tagsTab.style.color = 'white';
+            unitsContent.style.display = 'none';
+            tagsContent.style.display = 'block';
+            this.loadTagSettingsToManager(); // 태그 설정 새로고침
+        }
+    }
+
+    // 단위 관리 모달에 단위 목록 로드
+    async loadUnitsToManager() {
+        await this.loadUnits();
+        const container = document.getElementById('unitsList');
+
+        container.innerHTML = this.state.availableUnits.map(unit => `
+            <div class="unit-item">
+                <span class="unit-name">${unit}</span>
+                <button class="delete-btn" onclick="dashboard.deleteUnit('${unit}')">삭제</button>
+            </div>
+        `).join('');
+    }
+
+    // 단위 추가
+    async addUnit() {
+        const input = document.getElementById('newUnitInput');
+        const unitName = input.value.trim();
+
+        if (!unitName) {
+            this.showNotification('단위를 입력하세요', 'error');
+            return;
+        }
+
+        if (this.state.availableUnits.includes(unitName)) {
+            this.showNotification('이미 존재하는 단위입니다', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/units`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ unit_name: unitName })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('단위가 추가되었습니다', 'success');
+                input.value = '';
+                await this.loadUnitsToManager();
+            } else {
+                this.showNotification('추가 실패: ' + result.message, 'error');
+            }
+        } catch (error) {
+            console.error('단위 추가 실패:', error);
+            this.showNotification('추가 중 오류 발생', 'error');
+        }
+    }
+
+    // 단위 삭제
+    async deleteUnit(unitName) {
+        if (!confirm(`"${unitName}" 단위를 삭제하시겠습니까?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/units/${encodeURIComponent(unitName)}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('단위가 삭제되었습니다', 'success');
+                await this.loadUnitsToManager();
+            } else {
+                this.showNotification('삭제 실패: ' + result.message, 'error');
+            }
+        } catch (error) {
+            console.error('단위 삭제 실패:', error);
+            this.showNotification('삭제 중 오류 발생', 'error');
+        }
+    }
+
+    // 태그 설정 목록 로드 (설정 관리 모달용)
+    async loadTagSettingsToManager() {
+        const container = document.getElementById('tagSettingsList');
+
+        if (this.state.selectedTags.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #86868B; padding: 40px;">선택된 태그가 없습니다<br><br>먼저 계기를 선택해주세요</div>';
+            return;
+        }
+
+        await this.loadUnits();
+        await this.loadTagSettings();
+
+        container.innerHTML = this.state.selectedTags.map((tagName, index) => {
+            const tag = this.state.availableTagsData.find(t => t.tagname === tagName || t.tag_name === tagName);
+            const desc = tag?.description || tag?.tag_desc || tagName;
+            const setting = this.getTagSetting(tagName);
+
+            return `
+                <div style="background: white; border: 1px solid #E5E5EA; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: box-shadow 0.2s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'" onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,0.05)'">
+                    <div style="display: flex; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #F5F5F7;">
+                        <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; margin-right: 12px; font-size: 14px;">${index + 1}</div>
+                        <div style="flex: 1;">
+                            <div style="font-family: monospace; color: #007AFF; font-weight: 700; font-size: 15px; margin-bottom: 2px;">${tagName}</div>
+                            <div style="font-size: 12px; color: #86868B;">${desc}</div>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr; gap: 14px;">
+                        <div>
+                            <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #1D1D1F;">
+                                <span style="color: #007AFF;">●</span> 표시 이름
+                            </label>
+                            <input type="text" id="customName_${tagName}" value="${setting.customName || ''}" placeholder="비워두면 원래 이름 사용" style="width: 100%; padding: 10px 12px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 14px; transition: border-color 0.2s;" onfocus="this.style.borderColor='#007AFF'" onblur="this.style.borderColor='#E5E5EA'">
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <div>
+                                <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #1D1D1F;">
+                                    <span style="color: #007AFF;">●</span> 가중치
+                                </label>
+                                <input type="number" id="multiplier_${tagName}" value="${setting.multiplier}" step="0.1" min="0.001" style="width: 100%; padding: 10px 12px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 14px; transition: border-color 0.2s;" onfocus="this.style.borderColor='#007AFF'" onblur="this.style.borderColor='#E5E5EA'">
+                                <div style="font-size: 11px; color: #86868B; margin-top: 4px;">예: 2.0 = 2배</div>
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #1D1D1F;">
+                                    <span style="color: #007AFF;">●</span> 단위
+                                </label>
+                                <select id="unit_${tagName}" style="width: 100%; padding: 10px 12px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 14px; background: white; cursor: pointer; transition: border-color 0.2s;" onfocus="this.style.borderColor='#007AFF'" onblur="this.style.borderColor='#E5E5EA'">
+                                    <option value="">없음</option>
+                                    ${this.state.availableUnits.map(unit =>
+                                        `<option value="${unit}" ${setting.unit === unit ? 'selected' : ''}>${unit}</option>`
+                                    ).join('')}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // 개별 태그 설정 저장
+    async saveTagSetting(tagName) {
+        const customName = document.getElementById(`customName_${tagName}`).value.trim() || null;
+        const multiplier = parseFloat(document.getElementById(`multiplier_${tagName}`).value) || 1.0;
+        const unit = document.getElementById(`unit_${tagName}`).value || null;
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/tag-settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tag_name: tagName,
+                    custom_name: customName,
+                    multiplier: multiplier,
+                    unit: unit
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('설정이 저장되었습니다', 'success');
+                await this.loadTagSettings();
+                this.renderWidgets();
+                this.refreshData();
+            } else {
+                this.showNotification('저장 실패: ' + result.message, 'error');
+            }
+        } catch (error) {
+            console.error('설정 저장 실패:', error);
+            this.showNotification('저장 중 오류 발생', 'error');
+        }
+    }
+
+    // 개별 태그 설정 초기화
+    async resetTagSetting(tagName) {
+        if (!confirm(`"${tagName}" 태그의 설정을 초기화하시겠습니까?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/tag-settings/${encodeURIComponent(tagName)}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('설정이 초기화되었습니다', 'success');
+                await this.loadTagSettings();
+                this.renderWidgets();
+                this.refreshData();
+                await this.loadTagSettingsToManager();
+            } else {
+                this.showNotification('초기화 실패: ' + result.message, 'error');
+            }
+        } catch (error) {
+            console.error('설정 초기화 실패:', error);
+            this.showNotification('초기화 중 오류 발생', 'error');
+        }
+    }
+
+    // 모든 태그 설정 일괄 저장
+    async saveAllTagSettings() {
+        if (this.state.selectedTags.length === 0) {
+            this.showNotification('선택된 태그가 없습니다', 'error');
+            return;
+        }
+
+        try {
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const tagName of this.state.selectedTags) {
+                const customName = document.getElementById(`customName_${tagName}`)?.value.trim() || null;
+                const multiplier = parseFloat(document.getElementById(`multiplier_${tagName}`)?.value) || 1.0;
+                const unit = document.getElementById(`unit_${tagName}`)?.value || null;
+
+                try {
+                    const response = await fetch(`${this.apiBaseUrl}/tag-settings`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            tag_name: tagName,
+                            custom_name: customName,
+                            multiplier: multiplier,
+                            unit: unit
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                        console.error(`${tagName} 저장 실패:`, result.message);
+                    }
+                } catch (err) {
+                    errorCount++;
+                    console.error(`${tagName} 저장 오류:`, err);
+                }
+            }
+
+            if (errorCount === 0) {
+                this.showNotification(`${successCount}개 태그 설정이 모두 저장되었습니다`, 'success');
+            } else {
+                this.showNotification(`${successCount}개 저장 완료, ${errorCount}개 실패`, 'error');
+            }
+
+            await this.loadTagSettings();
+            this.renderWidgets();
+            this.refreshData();
+        } catch (error) {
+            console.error('일괄 저장 실패:', error);
+            this.showNotification('저장 중 오류 발생', 'error');
+        }
+    }
+
+    // 모든 태그 설정 일괄 초기화
+    async resetAllTagSettings() {
+        if (this.state.selectedTags.length === 0) {
+            this.showNotification('선택된 태그가 없습니다', 'error');
+            return;
+        }
+
+        if (!confirm(`모든 태그(${this.state.selectedTags.length}개)의 설정을 초기화하시겠습니까?`)) {
+            return;
+        }
+
+        try {
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const tagName of this.state.selectedTags) {
+                try {
+                    const response = await fetch(`${this.apiBaseUrl}/tag-settings/${encodeURIComponent(tagName)}`, {
+                        method: 'DELETE'
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        successCount++;
+                    } else {
+                        // 설정이 없어도 성공으로 처리
+                        successCount++;
+                    }
+                } catch (err) {
+                    errorCount++;
+                    console.error(`${tagName} 초기화 오류:`, err);
+                }
+            }
+
+            if (errorCount === 0) {
+                this.showNotification(`${successCount}개 태그 설정이 모두 초기화되었습니다`, 'success');
+            } else {
+                this.showNotification(`${successCount}개 초기화 완료, ${errorCount}개 실패`, 'error');
+            }
+
+            await this.loadTagSettings();
+            this.renderWidgets();
+            this.refreshData();
+            await this.loadTagSettingsToManager();
+        } catch (error) {
+            console.error('일괄 초기화 실패:', error);
+            this.showNotification('초기화 중 오류 발생', 'error');
+        }
+    }
+
+    // 위젯 설정 모달 열기
+    openWidgetSettings(tagName) {
+        const tag = this.state.availableTagsData.find(t => t.tagname === tagName);
+        if (!tag) return;
+
+        const setting = this.getTagSetting(tagName);
+
+        // 모달에 현재 값 설정
+        document.getElementById('settingsTagName').textContent = tagName;
+        document.getElementById('settingsOriginalName').textContent = tag.description;
+        document.getElementById('settingsCustomName').value = setting.customName || '';
+        document.getElementById('settingsMultiplier').value = setting.multiplier;
+
+        // 단위 선택 드롭다운 생성
+        const unitSelect = document.getElementById('settingsUnit');
+        unitSelect.innerHTML = '<option value="">없음</option>' +
+            this.state.availableUnits.map(unit =>
+                `<option value="${unit}" ${setting.unit === unit ? 'selected' : ''}>${unit}</option>`
+            ).join('');
+
+        // 현재 태그 저장
+        this.currentSettingTag = tagName;
+
+        this.openModal('widgetSettingsModal');
+    }
+
+    // 위젯 설정 저장
+    async saveWidgetSettings() {
+        const tagName = this.currentSettingTag;
+        const customName = document.getElementById('settingsCustomName').value.trim() || null;
+        const multiplier = parseFloat(document.getElementById('settingsMultiplier').value) || 1.0;
+        const unit = document.getElementById('settingsUnit').value || null;
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/tag-settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tag_name: tagName,
+                    custom_name: customName,
+                    multiplier: multiplier,
+                    unit: unit
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('설정이 저장되었습니다', 'success');
+                await this.loadTagSettings();
+                this.renderWidgets();
+                this.refreshData();
+                this.closeModal('widgetSettingsModal');
+            } else {
+                this.showNotification('저장 실패: ' + result.message, 'error');
+            }
+        } catch (error) {
+            console.error('설정 저장 실패:', error);
+            this.showNotification('저장 중 오류 발생', 'error');
+        }
+    }
+
+    // 위젯 설정 초기화
+    async resetWidgetSettings() {
+        const tagName = this.currentSettingTag;
+
+        if (!confirm('이 태그의 설정을 초기화하시겠습니까?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/tag-settings/${encodeURIComponent(tagName)}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('설정이 초기화되었습니다', 'success');
+                await this.loadTagSettings();
+                this.renderWidgets();
+                this.refreshData();
+                this.closeModal('widgetSettingsModal');
+            } else {
+                this.showNotification('초기화 실패: ' + result.message, 'error');
+            }
+        } catch (error) {
+            console.error('설정 초기화 실패:', error);
+            this.showNotification('초기화 중 오류 발생', 'error');
         }
     }
 }

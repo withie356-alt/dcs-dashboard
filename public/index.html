@@ -250,6 +250,41 @@
             50% { opacity: 0.5; }
         }
 
+        .refresh-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: rgba(0, 122, 255, 0.12);
+            border-radius: 50%;
+            font-size: 18px;
+            color: #007AFF;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(0, 122, 255, 0.2);
+            transform: rotate(45deg);
+        }
+
+        .refresh-btn:active {
+            transform: rotate(180deg);
+            background: rgba(0, 122, 255, 0.3);
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .refresh-btn.loading {
+            animation: spin 1s linear infinite;
+            pointer-events: none;
+        }
+
         .dashboard-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -609,6 +644,44 @@
             .widget-unit {
                 font-size: 14px;
             }
+        }
+
+        /* 단위 관리 스타일 */
+        .unit-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            border-bottom: 1px solid #F5F5F7;
+        }
+
+        .unit-item:last-child {
+            border-bottom: none;
+        }
+
+        .unit-name {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .delete-btn {
+            padding: 6px 12px;
+            background: #FF3B30;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+
+        .delete-btn:hover {
+            opacity: 0.8;
+        }
+
+        .delete-btn:active {
+            opacity: 0.6;
         }
 
         .loading-overlay {
@@ -1077,9 +1150,14 @@
         <div class="header" id="mainHeader">
             <button class="header-menu-btn" onclick="dashboard.toggleMenu()" id="menuBtn">☰</button>
             <h1>DCS 모니터링</h1>
-            <div class="time-display" id="timeDisplay" style="margin-left: auto;">
-                <div class="status-dot"></div>
-                <span id="currentDateTime">--</span>
+            <div style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
+                <div class="time-display" id="timeDisplay">
+                    <div class="status-dot"></div>
+                    <span id="currentDateTime">--</span>
+                </div>
+                <button class="refresh-btn" onclick="dashboard.refreshData()" title="데이터 새로고침">
+                    ↻
+                </button>
             </div>
 
             <!-- 드롭다운 메뉴 -->
@@ -1098,6 +1176,9 @@
                 </button>
                 <button class="dropdown-item" onclick="dashboard.openTagSelector(); dashboard.closeMenu();">
                     📊 계기 선택
+                </button>
+                <button class="dropdown-item" onclick="dashboard.openSettingsManager(); dashboard.closeMenu();">
+                    ⚙️ 설정 관리
                 </button>
                 <button class="dropdown-item" onclick="dashboard.refreshData(); dashboard.closeMenu();">
                     🔄 새로고침
@@ -1199,11 +1280,95 @@
     <!-- 알림 -->
     <div class="notification" id="notification"></div>
 
+    <!-- 설정 관리 모달 -->
+    <div class="modal" id="settingsManagerModal" onclick="if(event.target===this) dashboard.closeModal('settingsManagerModal')">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 class="modal-title">설정 관리</h2>
+                <button class="close-btn" onclick="dashboard.closeModal('settingsManagerModal')">×</button>
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <!-- 탭 헤더 -->
+                <div style="display: flex; border-bottom: 1px solid #E5E5EA;">
+                    <button id="tagsTab" onclick="dashboard.switchSettingsTab('tags')" style="flex: 1; padding: 16px; border: none; background: #007AFF; color: white; cursor: pointer; font-weight: 600; font-size: 14px;">태그 설정</button>
+                    <button id="unitsTab" onclick="dashboard.switchSettingsTab('units')" style="flex: 1; padding: 16px; border: none; background: white; color: #1D1D1F; cursor: pointer; font-weight: 600; font-size: 14px;">단위 관리</button>
+                </div>
+
+                <!-- 태그 설정 탭 -->
+                <div id="tagsTabContent" style="display: flex; flex-direction: column; height: 500px;">
+                    <div id="tagSettingsList" style="flex: 1; overflow-y: auto; padding: 20px;">
+                        <div style="text-align: center; color: #86868B; padding: 40px;">선택된 태그가 없습니다</div>
+                    </div>
+                    <div style="position: sticky; bottom: 0; padding: 16px 20px; background: #F5F5F7; border-top: 1px solid #E5E5EA; display: flex; gap: 12px; z-index: 10;">
+                        <button onclick="dashboard.saveAllTagSettings()" class="btn btn-primary" style="flex: 2;">모두 저장</button>
+                        <button onclick="dashboard.resetAllTagSettings()" class="btn" style="flex: 1; background: white; color: #FF3B30; border: 1px solid #FF3B30;">모두 초기화</button>
+                    </div>
+                </div>
+
+                <!-- 단위 관리 탭 -->
+                <div id="unitsTabContent" style="padding: 24px; display: none;">
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">새 단위 추가</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="newUnitInput" placeholder="예: kW, m³/h" style="flex: 1; padding: 10px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 14px;">
+                            <button onclick="dashboard.addUnit()" class="btn btn-primary">추가</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">등록된 단위</label>
+                        <div id="unitsList" style="max-height: 300px; overflow-y: auto; border: 1px solid #E5E5EA; border-radius: 8px; padding: 12px;">
+                            <div style="text-align: center; color: #86868B;">로딩 중...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 개별 위젯 설정 모달 (제거 예정이지만 호환성 유지) -->
+    <div class="modal" id="widgetSettingsModal" onclick="if(event.target===this) dashboard.closeModal('widgetSettingsModal')">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2 class="modal-title">위젯 설정</h2>
+                <button class="close-btn" onclick="dashboard.closeModal('widgetSettingsModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 4px; font-weight: 600;">태그</label>
+                    <div id="settingsTagName" style="padding: 10px; background: #F5F5F7; border-radius: 8px; font-family: monospace; color: #007AFF;">--</div>
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 4px; font-weight: 600;">원래 이름</label>
+                    <div id="settingsOriginalName" style="padding: 10px; background: #F5F5F7; border-radius: 8px; color: #86868B;">--</div>
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">표시 이름 (커스텀)</label>
+                    <input type="text" id="settingsCustomName" placeholder="비워두면 원래 이름 사용" style="width: 100%; padding: 10px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 14px;">
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">가중치 (배수)</label>
+                    <input type="number" id="settingsMultiplier" value="1.0" step="0.1" min="0.001" style="width: 100%; padding: 10px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 14px;">
+                    <div style="font-size: 12px; color: #86868B; margin-top: 4px;">예: 2.0 = 2배, 0.5 = 절반</div>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">단위</label>
+                    <select id="settingsUnit" style="width: 100%; padding: 10px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 14px;">
+                        <option value="">없음</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="dashboard.resetWidgetSettings()" class="btn" style="flex: 1; background: #F5F5F7; color: #FF3B30;">초기화</button>
+                    <button onclick="dashboard.saveWidgetSettings()" class="btn btn-primary" style="flex: 2;">저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 로딩 오버레이 -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
     </div>
 
-    <script src="dashboard.js?v=2"></script>
+    <script src="dashboard.js?v=7"></script>
 </body>
 </html>
