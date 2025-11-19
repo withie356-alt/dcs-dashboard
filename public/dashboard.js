@@ -446,6 +446,7 @@ class Dashboard {
                 <div class="widget-desc">${tagName}</div>
                 <div class="widget-value">
                     <span id="value-${tagName}">--</span>
+                    <span id="unit-${tagName}" class="widget-unit"></span>
                 </div>
             `;
 
@@ -619,14 +620,16 @@ class Dashboard {
                 const valueEl = document.getElementById(`value-${tagName}`);
                 if (valueEl) {
                     const adjustedValue = this.applyMultiplier(lastValue, tagName);
-                    valueEl.textContent = this.formatDisplayValue(adjustedValue, tagName);
+                    const formattedValue = typeof adjustedValue === 'number' ? adjustedValue.toFixed(2) : adjustedValue;
+                    valueEl.textContent = formattedValue;
                     console.log(`✅ ${tagName} 값 표시:`, adjustedValue);
                 }
 
-                // 단위 표시 (제거 - formatDisplayValue에 포함됨)
+                // 단위 표시
                 const unitEl = document.getElementById(`unit-${tagName}`);
                 if (unitEl) {
-                    unitEl.textContent = '';
+                    const setting = this.getTagSetting(tagName);
+                    unitEl.textContent = setting.unit || '';
                 }
             } else {
                 console.warn(`⚠️ ${tagName}에 값이 없습니다`);
@@ -859,12 +862,14 @@ class Dashboard {
                 const valueEl = document.getElementById(`value-${tagName}`);
                 if (valueEl) {
                     const adjustedValue = this.applyMultiplier(lastValue, tagName);
-                    valueEl.textContent = this.formatDisplayValue(adjustedValue, tagName);
+                    const formattedValue = typeof adjustedValue === 'number' ? adjustedValue.toFixed(2) : adjustedValue;
+                    valueEl.textContent = formattedValue;
                 }
 
                 const unitEl = document.getElementById(`unit-${tagName}`);
                 if (unitEl) {
-                    unitEl.textContent = this.getUnit(tagName);
+                    const setting = this.getTagSetting(tagName);
+                    unitEl.textContent = setting.unit || '';
                 }
             }
         }
@@ -993,12 +998,14 @@ class Dashboard {
                 const valueEl = document.getElementById(`value-${tagName}`);
                 if (valueEl) {
                     const adjustedValue = this.applyMultiplier(lastValue, tagName);
-                    valueEl.textContent = this.formatDisplayValue(adjustedValue, tagName);
+                    const formattedValue = typeof adjustedValue === 'number' ? adjustedValue.toFixed(2) : adjustedValue;
+                    valueEl.textContent = formattedValue;
                 }
 
                 const unitEl = document.getElementById(`unit-${tagName}`);
                 if (unitEl) {
-                    unitEl.textContent = this.getUnit(tagName);
+                    const setting = this.getTagSetting(tagName);
+                    unitEl.textContent = setting.unit || '';
                 }
             }
         }
