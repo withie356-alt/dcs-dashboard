@@ -6,8 +6,8 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>DCS 모니?�링 ?�스??/title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>?��</text></svg>">
+    <title>DCS 모니터링 시스템</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%23007AFF'/><path d='M30 60 L40 45 L50 55 L70 30' stroke='white' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
@@ -646,7 +646,7 @@
             }
         }
 
-        /* ?�위 관�??��???*/
+        /* ?�위 관�??��???*/
         .unit-item {
             display: flex;
             justify-content: space-between;
@@ -955,7 +955,7 @@
                 font-size: 11px;
             }
 
-            /* ?�그 ?�택 모달 */
+            /* ?�그 ?�택 모달 */
             .modal-content {
                 max-width: 95vw !important;
                 width: 95%;
@@ -988,7 +988,7 @@
                 min-height: auto;
             }
 
-            /* 로그???�면 */
+            /* 로그???�면 */
             .login-box {
                 max-width: 340px;
                 padding: 28px 24px;
@@ -1029,7 +1029,7 @@
                 height: 32px;
             }
 
-            /* ?�내 메시지 */
+            /* ?�내 메시지 */
             .empty-state {
                 padding: 40px 16px;
             }
@@ -1070,7 +1070,7 @@
                 gap: 8px;
             }
 
-            /* 로그???�면 - ?��? ?�면 */
+            /* 로그???�면 - ?��? ?�면 */
             .login-box {
                 max-width: 300px;
                 padding: 24px 20px;
@@ -1108,7 +1108,7 @@
                 height: 28px;
             }
 
-            /* ?�내 메시지 - ?��? ?�면 */
+            /* ?�내 메시지 - ?��? ?�면 */
             .empty-state {
                 padding: 30px 12px;
             }
@@ -1128,41 +1128,41 @@
     </style>
 </head>
 <body>
-    <!-- 로그???�면 -->
+    <!-- 로그???�면 -->
     <div class="login-screen" id="loginScreen">
         <div class="login-header-logos">
             <img src="gs-logo.svg" alt="GS Logo" class="login-header-logo">
             <img src="52g_logo.svg" alt="52g Logo" class="login-header-logo">
         </div>
         <div class="login-box">
-            <img src="logo.png" alt="?�드?�천?�너지" class="login-logo">
-            <h2>DCS 모니?�링 ?�스??/h2>
-            <p class="login-subtitle">?�드?�천?�너지</p>
-            <input type="text" id="loginUsername" value="admin" class="login-input" placeholder="?�이??>
-            <input type="password" id="loginPassword" value="" class="login-input" placeholder="비�?번호">
+            <img src="logo.png" alt="?�드?�천?�너지" class="login-logo">
+            <h2>DCS 모니?�링 ?�스??/h2>
+            <p class="login-subtitle">?�드?�천?�너지</p>
+            <input type="text" id="loginUsername" value="admin" class="login-input" placeholder="?�이??>
+            <input type="password" id="loginPassword" value="" class="login-input" placeholder="비�?번호">
             <button class="login-btn" onclick="dashboard.login()">로그??/button>
             <div id="loginError"></div>
         </div>
     </div>
 
-    <!-- 메인 ?�?�보??-->
+    <!-- 메인 ?�?�보??-->
     <div class="container" id="mainContainer" style="display: none;">
         <div class="header" id="mainHeader">
             <button class="header-menu-btn" onclick="dashboard.toggleMenu()" id="menuBtn">??/button>
-            <h1>DCS 모니?�링</h1>
+            <h1>DCS 모니?�링</h1>
             <div style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
                 <div class="time-display" id="timeDisplay">
                     <div class="status-dot"></div>
                     <span id="currentDateTime">--</span>
                 </div>
-                <button class="refresh-btn" onclick="dashboard.refreshData()" title="?�이???�로고침">
+                <button class="refresh-btn" onclick="dashboard.refreshData()" title="?�이???�로고침">
                     ??                </button>
             </div>
 
-            <!-- ?�롭?�운 메뉴 -->
+            <!-- ?�롭?�운 메뉴 -->
             <div class="header-dropdown" id="headerDropdown">
                 <div class="dropdown-date-row">
-                    <div class="dropdown-date-label">?�이??기간 <span style="color: #86868B;">| 최�? 30??/span></div>
+                    <div class="dropdown-date-label">?�이??기간 <span style="color: #86868B;">| 최�? 30??/span></div>
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <input type="date" id="dateFrom" onchange="dashboard.onDateChange()" style="flex: 1; padding: 8px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 13px;">
                         <span style="color: #86868B;">~</span>
@@ -1171,75 +1171,75 @@
                 </div>
                 <div class="dropdown-divider"></div>
                 <button class="dropdown-item" onclick="dashboard.openLayoutManager(); dashboard.closeMenu();">
-                    ???�이?�웃 관�?                </button>
+                    ???�이?�웃 관�?                </button>
                 <button class="dropdown-item" onclick="dashboard.openTagSelector(); dashboard.closeMenu();">
-                    ?�� 계기 ?�택
+                    ?�� 계기 ?�택
                 </button>
                 <button class="dropdown-item" onclick="dashboard.openSettingsManager(); dashboard.closeMenu();">
-                    ?�️ ?�정 관�?                </button>
+                    ?�️ ?�정 관�?                </button>
                 <button class="dropdown-item" onclick="dashboard.refreshData(); dashboard.closeMenu();">
-                    ?�� ?�로고침
+                    ?�� ?�로고침
                 </button>
                 <div class="dropdown-divider"></div>
                 <button class="dropdown-item" onclick="dashboard.logout();" style="color: #FF3B30;">
-                    로그?�웃
+                    로그?�웃
                 </button>
             </div>
         </div>
 
         <div class="dashboard-grid" id="dashboardGrid">
-            <!-- ?�젯???�기???�적?�로 추�??�니??-->
+            <!-- ?�젯???�기???�적?�로 추�??�니??-->
         </div>
     </div>
 
-    <!-- ?�그 ?�택 모달 -->
+    <!-- ?�그 ?�택 모달 -->
     <div class="modal" id="tagSelectorModal" onclick="if(event.target===this) dashboard.closeModal('tagSelectorModal')">
         <div class="modal-content">
             <div class="modal-header">
                 <div style="flex: 1;">
-                    <h2 class="modal-title" style="margin-bottom: 4px;">계기 ?�택</h2>
-                    <div id="metaLastUpdated" style="font-size: 11px; color: #86868B;">캐시 ?�음</div>
+                    <h2 class="modal-title" style="margin-bottom: 4px;">계기 ?�택</h2>
+                    <div id="metaLastUpdated" style="font-size: 11px; color: #86868B;">캐시 ?�음</div>
                 </div>
-                <button class="btn btn-primary" style="margin-right: 12px; height: 36px; padding: 8px 16px; font-size: 13px;" onclick="dashboard.refreshMetadata()" id="refreshMetaHeaderBtn">?�� 목록 ?�데?�트</button>
+                <button class="btn btn-primary" style="margin-right: 12px; height: 36px; padding: 8px 16px; font-size: 13px;" onclick="dashboard.refreshMetadata()" id="refreshMetaHeaderBtn">?�� 목록 ?�데?�트</button>
                 <button class="close-btn" onclick="dashboard.closeModal('tagSelectorModal')">×</button>
             </div>
 
             <div class="modal-body">
                 <div class="tag-search">
-                    <input type="text" id="tagSearchInput" placeholder="?�그 검??.." oninput="dashboard.searchTags()">
+                    <input type="text" id="tagSearchInput" placeholder="?�그 검??.." oninput="dashboard.searchTags()">
                 </div>
 
-                <div class="selected-count" id="selectedCount">?�택??계기: 0�?/div>
+                <div class="selected-count" id="selectedCount">?�택??계기: 0�?/div>
 
                 <div class="tag-list-container" id="tagListContainer">
-                    <!-- ?�그 목록???�기???�적?�로 추�??�니??-->
+                    <!-- ?�그 목록???�기???�적?�로 추�??�니??-->
                 </div>
             </div>
 
             <div class="modal-actions">
-                <button class="btn btn-primary" onclick="dashboard.selectAllTags()">?�체 ?�택</button>
-                <button class="btn btn-primary" onclick="dashboard.clearAllTags()">?�체 ?�제</button>
-                <button class="btn btn-primary" style="margin-left: auto;" onclick="dashboard.applySelectedTags()">?�용</button>
+                <button class="btn btn-primary" onclick="dashboard.selectAllTags()">?�체 ?�택</button>
+                <button class="btn btn-primary" onclick="dashboard.clearAllTags()">?�체 ?�제</button>
+                <button class="btn btn-primary" style="margin-left: auto;" onclick="dashboard.applySelectedTags()">?�용</button>
             </div>
         </div>
     </div>
 
-    <!-- ?�이?�웃 관�?모달 -->
+    <!-- ?�이?�웃 관�?모달 -->
     <div class="modal" id="layoutManagerModal" onclick="if(event.target===this) dashboard.closeModal('layoutManagerModal')">
         <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
-                <h2 class="modal-title">?�이?�웃 관�?/h2>
+                <h2 class="modal-title">?�이?�웃 관�?/h2>
                 <button class="close-btn" onclick="dashboard.closeModal('layoutManagerModal')">×</button>
             </div>
 
             <div class="modal-body">
                 <div id="layoutList" style="max-height: 300px; overflow-y: auto; margin-bottom: 16px;">
-                    <!-- ?�이?�웃 목록???�기???�시?�니??-->
+                    <!-- ?�이?�웃 목록???�기???�시?�니??-->
                 </div>
 
                 <div style="display: flex; gap: 12px;">
-                    <button class="btn btn-primary" style="flex: 1;" onclick="dashboard.saveCurrentLayout()">?�� ?�재 ?�이?�웃 ?�??/button>
-                    <button class="btn btn-primary" id="editModeBtn" onclick="dashboard.toggleEditMode()">?�️ ?�정 모드</button>
+                    <button class="btn btn-primary" style="flex: 1;" onclick="dashboard.saveCurrentLayout()">?�� ?�재 ?�이?�웃 ?�??/button>
+                    <button class="btn btn-primary" id="editModeBtn" onclick="dashboard.toggleEditMode()">?�️ ?�정 모드</button>
                 </div>
             </div>
         </div>
@@ -1255,15 +1255,15 @@
             <div class="modal-body" style="padding: 0;">
                 <div class="chart-stats" id="chartStats" style="display: flex; gap: 16px; padding: 12px 24px; background: #F5F5F7; border-bottom: 1px solid #E5E5EA;">
                     <div class="stat-item" style="flex: 1; text-align: center;">
-                        <div style="font-size: 10px; color: #86868B; margin-bottom: 3px;">최소�?/div>
+                        <div style="font-size: 10px; color: #86868B; margin-bottom: 3px;">최소�?/div>
                         <div id="statMin" style="font-size: 16px; font-weight: 700; color: #FF3B30;">--</div>
                     </div>
                     <div class="stat-item" style="flex: 1; text-align: center;">
-                        <div style="font-size: 10px; color: #86868B; margin-bottom: 3px;">?�균�?/div>
+                        <div style="font-size: 10px; color: #86868B; margin-bottom: 3px;">?�균�?/div>
                         <div id="statAvg" style="font-size: 16px; font-weight: 700; color: #007AFF;">--</div>
                     </div>
                     <div class="stat-item" style="flex: 1; text-align: center;">
-                        <div style="font-size: 10px; color: #86868B; margin-bottom: 3px;">최�?�?/div>
+                        <div style="font-size: 10px; color: #86868B; margin-bottom: 3px;">최�?�?/div>
                         <div id="statMax" style="font-size: 16px; font-weight: 700; color: #34C759;">--</div>
                     </div>
                 </div>
@@ -1274,47 +1274,47 @@
         </div>
     </div>
 
-    <!-- ?�림 -->
+    <!-- ?�림 -->
     <div class="notification" id="notification"></div>
 
-    <!-- ?�정 관�?모달 -->
+    <!-- ?�정 관�?모달 -->
     <div class="modal" id="settingsManagerModal" onclick="if(event.target===this) dashboard.closeModal('settingsManagerModal')">
         <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
-                <h2 class="modal-title">?�정 관�?/h2>
+                <h2 class="modal-title">?�정 관�?/h2>
                 <button class="close-btn" onclick="dashboard.closeModal('settingsManagerModal')">×</button>
             </div>
             <div class="modal-body" style="padding: 0;">
-                <!-- ???�더 -->
+                <!-- ???�더 -->
                 <div style="display: flex; border-bottom: 1px solid #E5E5EA;">
-                    <button id="tagsTab" onclick="dashboard.switchSettingsTab('tags')" style="flex: 1; padding: 16px; border: none; background: #007AFF; color: white; cursor: pointer; font-weight: 600; font-size: 14px;">?�그 ?�정</button>
-                    <button id="unitsTab" onclick="dashboard.switchSettingsTab('units')" style="flex: 1; padding: 16px; border: none; background: white; color: #1D1D1F; cursor: pointer; font-weight: 600; font-size: 14px;">?�위 관�?/button>
+                    <button id="tagsTab" onclick="dashboard.switchSettingsTab('tags')" style="flex: 1; padding: 16px; border: none; background: #007AFF; color: white; cursor: pointer; font-weight: 600; font-size: 14px;">?�그 ?�정</button>
+                    <button id="unitsTab" onclick="dashboard.switchSettingsTab('units')" style="flex: 1; padding: 16px; border: none; background: white; color: #1D1D1F; cursor: pointer; font-weight: 600; font-size: 14px;">?�위 관�?/button>
                 </div>
 
-                <!-- ?�그 ?�정 ??-->
+                <!-- ?�그 ?�정 ??-->
                 <div id="tagsTabContent" style="display: flex; flex-direction: column; height: 500px;">
                     <div id="tagSettingsList" style="flex: 1; overflow-y: auto; padding: 20px;">
-                        <div style="text-align: center; color: #86868B; padding: 40px;">?�택???�그가 ?�습?�다</div>
+                        <div style="text-align: center; color: #86868B; padding: 40px;">?�택???�그가 ?�습?�다</div>
                     </div>
                     <div style="position: sticky; bottom: 0; padding: 16px 20px; background: #F5F5F7; border-top: 1px solid #E5E5EA; display: flex; gap: 12px; z-index: 10;">
-                        <button onclick="dashboard.saveAllTagSettings()" class="btn btn-primary" style="flex: 2;">모두 ?�??/button>
+                        <button onclick="dashboard.saveAllTagSettings()" class="btn btn-primary" style="flex: 2;">모두 ?�??/button>
                         <button onclick="dashboard.resetAllTagSettings()" class="btn" style="flex: 1; background: white; color: #FF3B30; border: 1px solid #FF3B30;">모두 초기??/button>
                     </div>
                 </div>
 
-                <!-- ?�위 관�???-->
+                <!-- ?�위 관�???-->
                 <div id="unitsTabContent" style="padding: 24px; display: none;">
                     <div style="margin-bottom: 20px;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">???�위 추�?</label>
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">???�위 추�?</label>
                         <div style="display: flex; gap: 8px;">
                             <input type="text" id="newUnitInput" placeholder="?? kW, m³/h" style="flex: 1; padding: 10px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 14px;">
-                            <button onclick="dashboard.addUnit()" class="btn btn-primary">추�?</button>
+                            <button onclick="dashboard.addUnit()" class="btn btn-primary">추�?</button>
                         </div>
                     </div>
                     <div>
-                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">?�록???�위</label>
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">?�록???�위</label>
                         <div id="unitsList" style="max-height: 300px; overflow-y: auto; border: 1px solid #E5E5EA; border-radius: 8px; padding: 12px;">
-                            <div style="text-align: center; color: #86868B;">로딩 �?..</div>
+                            <div style="text-align: center; color: #86868B;">로딩 �?..</div>
                         </div>
                     </div>
                 </div>
@@ -1322,46 +1322,46 @@
         </div>
     </div>
 
-    <!-- 개별 ?�젯 ?�정 모달 (?�거 ?�정?��?�??�환???��?) -->
+    <!-- 개별 ?�젯 ?�정 모달 (?�거 ?�정?��?�??�환???��?) -->
     <div class="modal" id="widgetSettingsModal" onclick="if(event.target===this) dashboard.closeModal('widgetSettingsModal')">
         <div class="modal-content" style="max-width: 500px;">
             <div class="modal-header">
-                <h2 class="modal-title">?�젯 ?�정</h2>
+                <h2 class="modal-title">?�젯 ?�정</h2>
                 <button class="close-btn" onclick="dashboard.closeModal('widgetSettingsModal')">×</button>
             </div>
             <div class="modal-body">
                 <div style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 4px; font-weight: 600;">?�그</label>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 600;">?�그</label>
                     <div id="settingsTagName" style="padding: 10px; background: #F5F5F7; border-radius: 8px; font-family: monospace; color: #007AFF;">--</div>
                 </div>
                 <div style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 4px; font-weight: 600;">?�래 ?�름</label>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 600;">?�래 ?�름</label>
                     <div id="settingsOriginalName" style="padding: 10px; background: #F5F5F7; border-radius: 8px; color: #86868B;">--</div>
                 </div>
                 <div style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">?�시 ?�름 (커스?�)</label>
-                    <input type="text" id="settingsCustomName" placeholder="비워?�면 ?�래 ?�름 ?�용" style="width: 100%; padding: 10px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 14px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">?�시 ?�름 (커스?�)</label>
+                    <input type="text" id="settingsCustomName" placeholder="비워?�면 ?�래 ?�름 ?�용" style="width: 100%; padding: 10px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 14px;">
                 </div>
                 <div style="margin-bottom: 16px;">
                     <label style="display: block; margin-bottom: 8px; font-weight: 600;">가중치 (배수)</label>
                     <input type="number" id="settingsMultiplier" value="1.0" step="0.1" min="0.001" style="width: 100%; padding: 10px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 14px;">
-                    <div style="font-size: 12px; color: #86868B; margin-top: 4px;">?? 2.0 = 2�? 0.5 = ?�반</div>
+                    <div style="font-size: 12px; color: #86868B; margin-top: 4px;">?? 2.0 = 2�? 0.5 = ?�반</div>
                 </div>
                 <div style="margin-bottom: 20px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">?�위</label>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">?�위</label>
                     <select id="settingsUnit" style="width: 100%; padding: 10px; border: 1px solid #E5E5EA; border-radius: 8px; font-size: 14px;">
-                        <option value="">?�음</option>
+                        <option value="">?�음</option>
                     </select>
                 </div>
                 <div style="display: flex; gap: 8px;">
                     <button onclick="dashboard.resetWidgetSettings()" class="btn" style="flex: 1; background: #F5F5F7; color: #FF3B30;">초기??/button>
-                    <button onclick="dashboard.saveWidgetSettings()" class="btn btn-primary" style="flex: 2;">?�??/button>
+                    <button onclick="dashboard.saveWidgetSettings()" class="btn btn-primary" style="flex: 2;">?�??/button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 로딩 ?�버?�이 -->
+    <!-- 로딩 ?�버?�이 -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
     </div>
