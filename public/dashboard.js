@@ -542,9 +542,7 @@ class Dashboard {
             this.showNotification('데이터를 불러오는데 실패했습니다.', 'error');
             this.showConnectionError();
         } finally {
-            if (refreshBtn) {
-                refreshBtn.classList.remove('loading');
-            }
+            refreshBtns.forEach(btn => btn.classList.remove('loading'));
             if (loadingOverlay) {
                 loadingOverlay.classList.remove('show');
             }
